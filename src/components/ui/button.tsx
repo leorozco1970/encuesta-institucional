@@ -1,1 +1,1 @@
-export const Button = ({children}: any) => <button>{children}</button>; 
+export const Button = ({children, className, ...props}: any) => <button className={`inline-flex items-center justify-center rounded-md bg-blue-700 px-4 py-2 text-white hover:bg-blue-800 ${className}`} {...props}>{children}</button>;

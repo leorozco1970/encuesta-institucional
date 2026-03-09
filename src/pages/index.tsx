@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   UserCircle, Users, BookOpen, GraduationCap, Lock, 
-  ArrowLeft, CheckCircle2, BarChart3, Activity, 
+  ArrowLeft, CheckCircle2, BarChart3, 
   AlertCircle, Check, Loader2, School, ChevronRight, Keyboard, Mail
 } from 'lucide-react';
 import { 
@@ -9,7 +9,7 @@ import {
   Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
 
-// --- 1. CONFIGURACIÓN DE SEGURIDAD ---
+// --- 1. CONFIGURACIÓN DE ACCESO ---
 const ACCESO: any = {
   Directivos: { pin: "1111", total: 12, ids: ['d1','d2','d3','d4','d5','d6','d7','d8','d9','d10','d11','d12'] },
   Docentes: { pin: "2222", total: 12, ids: ['doc1','doc2','doc3','doc4','doc5','doc6','doc7','doc8','doc9','doc10','doc11','doc12'] },
@@ -18,7 +18,7 @@ const ACCESO: any = {
   Admin: { pin: "0000" }
 };
 
-// --- 2. COMPONENTES BASE ---
+// --- 2. COMPONENTES DE DISEÑO ---
 const Card = ({ children, className = "" }: any) => (
   <div className={`bg-white rounded-[40px] shadow-2xl border border-gray-100 p-8 ${className}`}>{children}</div>
 );
@@ -36,7 +36,6 @@ const Button = ({ children, onClick, variant = "primary", className = "", type =
   );
 };
 
-// --- 3. SUBCOMPONENTES DE PREGUNTA ---
 function Question({ label, id, options, respuestas, onCheck }: any) {
   return (
     <div className="space-y-6">
@@ -80,7 +79,7 @@ function MultiSelect({ label, id, options, respuestas, onCheck }: any) {
   );
 }
 
-// --- 4. FORMULARIOS (12 PREGUNTAS POR ROL) ---
+// --- 3. FORMULARIOS ---
 const FormDirectivos = ({r, g}: any) => (
   <>
     <Question label="1. El contexto social y cultural de los estudiantes se integra en el diseño de los centros de interés." id="d1" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
@@ -143,11 +142,11 @@ const FormEstudiantes = ({r, g}: any) => (
     <Question label="9. Gracias a los centros, he mejorado mis relaciones con otros estudiantes." id="e9" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
     <Question label="10. En general, ¿qué tan bueno es el impacto de los centros para ti?" id="e10" options={["Muy bueno", "Bueno", "Regular", "Malo"]} respuestas={r} onCheck={g} />
     <Question label="11. ¿En la escuela nos dan tiempo y espacio suficiente para los centros?" id="e11" options={["Sí, horario normal", "Sí, otro horario", "Sí, en ambos", "No dan suficiente"]} respuestas={r} onCheck={g} />
-    <Question label="12. ¿Afecta negativamente otras materias cuando hacemos los centros?" id="e12" options={["Mucho (me perjudica)", "Algo", "Poco", "Nada (not afecta)"]} respuestas={r} onCheck={g} />
+    <Question label="12. ¿Afecta negativamente otras materias cuando hacemos los centros?" id="e12" options={["Mucho (me perjudica)", "Algo", "Poco", "Nada (no afecta)"]} respuestas={r} onCheck={g} />
   </>
 );
 
-// --- 5. COMPONENTE PRINCIPAL ---
+// --- 4. COMPONENTE PRINCIPAL ---
 export default function DiagnosticoAutomatizado() {
   const [vista, setVista] = useState<'colegio' | 'inicio' | 'login' | 'encuesta' | 'dashboard'>('colegio');
   const [instInput, setInstInput] = useState("");
@@ -172,15 +171,16 @@ export default function DiagnosticoAutomatizado() {
     e.preventDefault();
     setEnviando(true);
     
-    // Convertimos el objeto de respuestas en un array ordenado para el Excel
+    // Preparar datos ordenados para Excel
     const idsOrdenados = ACCESO[rolSel!].ids;
     const arrayRespuestas = idsOrdenados.map((id: string) => {
       const val = respuestas[id];
-      return Array.isArray(val) ? val.join(", ") : val;
+      return Array.isArray(val) ? val.join(", ") : (val || "");
     });
 
     try {
-      const response = await fetch("/api/save", { // LLAMADA A TU API DE GOOGLE
+      // SOLO ENVIAMOS A GOOGLE SHEETS PARA MÁXIMA VELOCIDAD
+      const response = await fetch("/api/save", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,27 +191,14 @@ export default function DiagnosticoAutomatizado() {
         }),
       });
 
-      // También enviamos a Make por si quieres mantener ambos
-      await fetch("https://hook.us2.make.com/cwetc1ylcf4utmi1tqzk2nslpign89a8", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fecha: new Date().toLocaleString('es-CO'),
-          institucion: instInput.toUpperCase(),
-          email: emailInput.toLowerCase(),
-          rol: rolSel,
-          datos: respuestas
-        }),
-      });
-
       if (response.ok) { 
         setEnviado(true); 
         window.scrollTo(0,0); 
       } else {
-        throw new Error();
+        alert("El Excel está tardando en responder. ¡Por favor revisa si el dato ya llegó!");
       }
     } catch { 
-      alert("Error al guardar. Verifica tu conexión."); 
+      alert("Error de conexión. Intenta nuevamente, por favor."); 
     } finally { 
       setEnviando(false); 
     }
@@ -219,54 +206,40 @@ export default function DiagnosticoAutomatizado() {
 
   const respondidas = rolSel && rolSel !== 'Admin' ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;
   const incompleto = rolSel && rolSel !== 'Admin' ? respondidas < ACCESO[rolSel].total : true;
-
   const emailValido = emailInput.includes("@") && emailInput.includes(".");
 
-  // --- VISTA 0: IDENTIFICACIÓN ---
+  // --- VISTAS ---
   if (vista === 'colegio') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <Card className="max-w-2xl w-full space-y-10 py-16 border-t-[12px] border-[#1e3a8a]">
         <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-[#1e3a8a]"><School size={50} /></div>
         <div className="space-y-4">
             <h1 className="text-4xl font-black text-[#1e3a8a] uppercase tracking-tighter italic">Diagnóstico Participativo</h1>
-            <p className="text-xl font-bold text-slate-400 italic">Bienvenido, por favor identifica tu escuela y contacto:</p>
+            <p className="text-xl font-bold text-slate-400 italic">Bienvenido, por favor identifica tu escuela:</p>
         </div>
-        
         <div className="space-y-6 max-w-lg mx-auto">
             <div className="relative">
                 <Keyboard className="absolute left-5 top-6 text-blue-300" size={24} />
                 <input type="text" value={instInput} onChange={(e) => setInstInput(e.target.value)} placeholder="NOMBRE DE LA INSTITUCIÓN..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 uppercase transition-all shadow-inner bg-slate-50" />
             </div>
-
             <div className="relative">
                 <Mail className="absolute left-5 top-6 text-blue-300" size={24} />
-                <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="CORREO ELECTRÓNICO INSTITUCIONAL..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 transition-all shadow-inner bg-slate-50" />
+                <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="CORREO ELECTRÓNICO..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 transition-all shadow-inner bg-slate-50" />
             </div>
         </div>
-
-        <Button 
-            disabled={instInput.trim().length < 5 || !emailValido} 
-            onClick={() => setVista('inicio')} 
-            className="w-full max-w-xs mx-auto h-20 text-xl"
-        >
+        <Button disabled={instInput.trim().length < 5 || !emailValido} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20 text-xl">
             CONTINUAR <ChevronRight size={24} />
         </Button>
-        <div className="pt-4">
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Tutorías para el Aprendizaje 3.0</p>
-            <p className="text-[10px] text-[#1e3a8a] font-black uppercase tracking-[0.2em] mt-1">CDA G9 ATLANTICO</p>
-        </div>
       </Card>
     </div>
   );
 
-  // --- VISTA 1: SELECCIÓN DE ROL ---
   if (vista === 'inicio') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <div className="max-w-5xl w-full space-y-12">
         <header className="space-y-4">
           <div className="bg-[#1e3a8a] text-white px-10 py-3 rounded-full inline-flex flex-col items-center shadow-lg italic">
             <span className="font-black uppercase tracking-widest text-lg">{instInput}</span>
-            <span className="text-xs text-blue-200 font-bold">{emailInput}</span>
           </div>
           <h1 className="text-6xl font-black text-[#1e3a8a] tracking-tighter uppercase leading-tight">Impacto de los Centros de Interés</h1>
           <p className="text-2xl font-bold text-blue-600 uppercase tracking-widest italic underline decoration-blue-200">Selecciona tu Rol</p>
@@ -278,14 +251,12 @@ export default function DiagnosticoAutomatizado() {
           <RoleBtn icon={<GraduationCap size={56}/>} label="Estudiantes" onClick={() => {setRolSel('Estudiantes'); setVista('login')}} color="border-purple-500" />
         </div>
         <div className="pt-12 flex flex-col items-center gap-6">
-          <Button variant="outline" onClick={() => {setRolSel('Admin'); setVista('login')}}><BarChart3 size={24}/> PANEL ADMINISTRADOR</Button>
           <Button variant="ghost" onClick={() => setVista('colegio')}>← VOLVER / CAMBIAR DATOS</Button>
         </div>
       </div>
     </div>
   );
 
-  // --- VISTA 2: LOGIN ---
   if (vista === 'login') return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center">
       <Card className="max-w-md w-full space-y-8">
@@ -296,38 +267,17 @@ export default function DiagnosticoAutomatizado() {
     </div>
   );
 
-  // --- VISTA 3: DASHBOARD ---
-  if (vista === 'dashboard') return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-6xl mx-auto">
-        <Button variant="ghost" onClick={() => setVista('inicio')} className="mb-6 font-black uppercase"><ArrowLeft size={18}/> SALIR</Button>
-        <Card className="p-12"><h2 className="text-4xl font-black text-[#1e3a8a] mb-10 text-center uppercase tracking-tighter italic">Triangulación de Resultados</h2>
-          <div className="h-[550px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={[{tema:'CRESE',Directivos:80,Docentes:70,Padres:90,Estudiantes:85},{tema:'Convivencia',Directivos:75,Docentes:85,Padres:60,Estudiantes:95},{tema:'Motivación',Directivos:95,Docentes:80,Padres:88,Estudiantes:92},{tema:'Contexto',Directivos:70,Docentes:75,Padres:55,Estudiantes:80}]}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="tema" tick={{fontWeight: 'bold'}} /><YAxis /><Tooltip cursor={{fill: '#f1f5f9'}} /><Legend iconType="circle" />
-                <Bar dataKey="Directivos" fill="#3b82f6" radius={[6, 6, 0, 0]} /><Bar dataKey="Docentes" fill="#10b981" radius={[6, 6, 0, 0]} /><Bar dataKey="Padres" fill="#f59e0b" radius={[6, 6, 0, 0]} /><Bar dataKey="Estudiantes" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-
-  // --- VISTA 4: ÉXITO ---
   if (enviado) return (
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-6 text-center">
       <Card className="max-w-md w-full py-20 border-t-[16px] border-emerald-500">
         <CheckCircle2 size={120} className="text-emerald-500 mx-auto animate-bounce" />
         <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">¡Envío Exitoso!</h2>
-        <p className="text-xl text-slate-500 font-bold px-4 tracking-tighter italic">Tus datos han sido registrados. El informe será enviado al correo: {emailInput}</p>
+        <p className="text-xl text-slate-500 font-bold px-4 mb-8 italic">Tus datos han sido registrados correctamente en el Excel.</p>
         <Button className="w-full h-20 text-xl shadow-2xl" onClick={() => window.location.reload()}>FINALIZAR Y SALIR</Button>
       </Card>
     </div>
   );
 
-  // --- VISTA 5: ENCUESTA ---
   return (
     <div className="min-h-screen bg-slate-100 py-12 px-4">
       <div className="max-w-3xl mx-auto shadow-2xl rounded-[50px] overflow-hidden">
@@ -345,7 +295,7 @@ export default function DiagnosticoAutomatizado() {
             {rolSel === 'Padres' && <FormPadres r={respuestas} g={guardar} />}
             {rolSel === 'Estudiantes' && <FormEstudiantes r={respuestas} g={guardar} />}
             <div className="pt-12 border-t-8 border-slate-50">
-              {incompleto && <div className="text-center text-orange-600 font-black mb-8 animate-pulse uppercase"><AlertCircle size={24}/> Completa todo para enviar (*)</div>}
+              {incompleto && <div className="text-center text-orange-600 font-black mb-8 animate-pulse uppercase"><AlertCircle size={24}/> Completa todas las preguntas (*)</div>}
               <Button disabled={incompleto || enviando} type="submit" className="w-full h-28 text-3xl uppercase tracking-tighter shadow-2xl">{enviando ? <Loader2 className="animate-spin" size={48} /> : "Finalizar y Enviar"}</Button>
             </div>
           </form>

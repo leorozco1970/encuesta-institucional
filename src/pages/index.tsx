@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
 import { 
   UserCircle, Users, BookOpen, GraduationCap, Lock, 
-  ArrowLeft, CheckCircle2, BarChart3, 
-  AlertCircle, Check, Loader2, School, ChevronRight, Keyboard, Mail
+  ArrowLeft, CheckCircle2, AlertCircle, Check, Loader2, School, ChevronRight, Keyboard, Mail
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Legend 
-} from 'recharts';
 
 // --- 1. CONFIGURACIÓN DE ACCESO ---
 const ACCESO: any = {
@@ -79,7 +74,7 @@ function MultiSelect({ label, id, options, respuestas, onCheck }: any) {
   );
 }
 
-// --- 3. FORMULARIOS ---
+// --- 3. FORMULARIOS POR ROL ---
 const FormDirectivos = ({r, g}: any) => (
   <>
     <Question label="1. El contexto social y cultural de los estudiantes se integra en el diseño de los centros de interés." id="d1" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
@@ -148,7 +143,7 @@ const FormEstudiantes = ({r, g}: any) => (
 
 // --- 4. COMPONENTE PRINCIPAL ---
 export default function DiagnosticoAutomatizado() {
-  const [vista, setVista] = useState<'colegio' | 'inicio' | 'login' | 'encuesta' | 'dashboard'>('colegio');
+  const [vista, setVista] = useState<'colegio' | 'inicio' | 'login' | 'encuesta'>('colegio');
   const [instInput, setInstInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [rolSel, setRolSel] = useState<string | null>(null);
@@ -162,7 +157,7 @@ export default function DiagnosticoAutomatizado() {
 
   const validarPin = () => {
     if (rolSel && pinInput === ACCESO[rolSel].pin) {
-      setVista(rolSel === 'Admin' ? 'dashboard' : 'encuesta');
+      setVista('encuesta');
       setErrorPin(false); setPinInput("");
     } else { setErrorPin(true); setTimeout(() => setErrorPin(false), 2000); }
   };
@@ -178,58 +173,39 @@ export default function DiagnosticoAutomatizado() {
       return Array.isArray(val) ? val.join(", ") : (val || "");
     });
 
-    try {
-      // SOLO ENVIAMOS A GOOGLE SHEETS PARA MÁXIMA VELOCIDAD
-      const response = await fetch("/api/save", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          institucion: instInput.toUpperCase(),
-          correo: emailInput.toLowerCase(),
-          rol: rolSel,
-          respuestas: arrayRespuestas
-        }),
-      });
+    // MÉTODO: "FIRE AND FORGET" (Enviar y Salir de inmediato)
+    fetch("/api/save", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        institucion: instInput.toUpperCase(),
+        correo: emailInput.toLowerCase(),
+        rol: rolSel,
+        respuestas: arrayRespuestas
+      }),
+    });
 
-      if (response.ok) { 
-        setEnviado(true); 
-        window.scrollTo(0,0); 
-      } else {
-        alert("El Excel está tardando en responder. ¡Por favor revisa si el dato ya llegó!");
-      }
-    } catch { 
-      alert("Error de conexión. Intenta nuevamente, por favor."); 
-    } finally { 
-      setEnviando(false); 
-    }
+    // Pasamos a pantalla de éxito SIN esperar respuesta de Google
+    setTimeout(() => {
+      setEnviado(true);
+      setEnviando(false);
+      window.scrollTo(0,0);
+    }, 1000);
   };
 
-  const respondidas = rolSel && rolSel !== 'Admin' ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;
-  const incompleto = rolSel && rolSel !== 'Admin' ? respondidas < ACCESO[rolSel].total : true;
-  const emailValido = emailInput.includes("@") && emailInput.includes(".");
+  const respondidas = rolSel ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;
+  const incompleto = rolSel ? respondidas < ACCESO[rolSel].total : true;
 
-  // --- VISTAS ---
   if (vista === 'colegio') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <Card className="max-w-2xl w-full space-y-10 py-16 border-t-[12px] border-[#1e3a8a]">
-        <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-[#1e3a8a]"><School size={50} /></div>
-        <div className="space-y-4">
-            <h1 className="text-4xl font-black text-[#1e3a8a] uppercase tracking-tighter italic">Diagnóstico Participativo</h1>
-            <p className="text-xl font-bold text-slate-400 italic">Bienvenido, por favor identifica tu escuela:</p>
-        </div>
+        <School size={60} className="mx-auto text-[#1e3a8a]" />
+        <h1 className="text-4xl font-black text-[#1e3a8a] uppercase italic">Diagnóstico Institucional</h1>
         <div className="space-y-6 max-w-lg mx-auto">
-            <div className="relative">
-                <Keyboard className="absolute left-5 top-6 text-blue-300" size={24} />
-                <input type="text" value={instInput} onChange={(e) => setInstInput(e.target.value)} placeholder="NOMBRE DE LA INSTITUCIÓN..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 uppercase transition-all shadow-inner bg-slate-50" />
-            </div>
-            <div className="relative">
-                <Mail className="absolute left-5 top-6 text-blue-300" size={24} />
-                <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="CORREO ELECTRÓNICO..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 transition-all shadow-inner bg-slate-50" />
-            </div>
+            <input type="text" value={instInput} onChange={(e) => setInstInput(e.target.value)} placeholder="NOMBRE DE LA INSTITUCIÓN..." className="w-full px-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 uppercase bg-slate-50" />
+            <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="TU CORREO ELECTRÓNICO..." className="w-full px-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 bg-slate-50" />
         </div>
-        <Button disabled={instInput.trim().length < 5 || !emailValido} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20 text-xl">
-            CONTINUAR <ChevronRight size={24} />
-        </Button>
+        <Button disabled={instInput.trim().length < 5 || !emailInput.includes("@")} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20">CONTINUAR</Button>
       </Card>
     </div>
   );
@@ -237,21 +213,13 @@ export default function DiagnosticoAutomatizado() {
   if (vista === 'inicio') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <div className="max-w-5xl w-full space-y-12">
-        <header className="space-y-4">
-          <div className="bg-[#1e3a8a] text-white px-10 py-3 rounded-full inline-flex flex-col items-center shadow-lg italic">
-            <span className="font-black uppercase tracking-widest text-lg">{instInput}</span>
-          </div>
-          <h1 className="text-6xl font-black text-[#1e3a8a] tracking-tighter uppercase leading-tight">Impacto de los Centros de Interés</h1>
-          <p className="text-2xl font-bold text-blue-600 uppercase tracking-widest italic underline decoration-blue-200">Selecciona tu Rol</p>
-        </header>
+        <h1 className="text-5xl font-black text-[#1e3a8a] uppercase italic">{instInput}</h1>
+        <p className="text-2xl font-bold text-blue-600 uppercase italic">Selecciona tu Rol para comenzar</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <RoleBtn icon={<UserCircle size={56}/>} label="Directivos" onClick={() => {setRolSel('Directivos'); setVista('login')}} color="border-blue-500" />
           <RoleBtn icon={<BookOpen size={56}/>} label="Docentes" onClick={() => {setRolSel('Docentes'); setVista('login')}} color="border-emerald-500" />
           <RoleBtn icon={<Users size={56}/>} label="Padres" onClick={() => {setRolSel('Padres'); setVista('login')}} color="border-orange-500" />
           <RoleBtn icon={<GraduationCap size={56}/>} label="Estudiantes" onClick={() => {setRolSel('Estudiantes'); setVista('login')}} color="border-purple-500" />
-        </div>
-        <div className="pt-12 flex flex-col items-center gap-6">
-          <Button variant="ghost" onClick={() => setVista('colegio')}>← VOLVER / CAMBIAR DATOS</Button>
         </div>
       </div>
     </div>
@@ -260,9 +228,9 @@ export default function DiagnosticoAutomatizado() {
   if (vista === 'login') return (
     <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center">
       <Card className="max-w-md w-full space-y-8">
-        <Lock size={40} className="mx-auto text-blue-600"/><h2 className="text-2xl font-black text-[#1e3a8a] uppercase tracking-tighter italic">Acceso {rolSel}</h2>
+        <Lock size={40} className="mx-auto text-blue-600"/><h2 className="text-2xl font-black text-[#1e3a8a] uppercase italic">Acceso {rolSel}</h2>
         <input type="password" value={pinInput} onChange={(e) => setPinInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && validarPin()} className={`w-full text-center text-5xl p-6 rounded-3xl border-4 outline-none ${errorPin ? 'border-red-500 bg-red-50 animate-bounce' : 'border-blue-50 focus:border-[#1e3a8a]'}`} placeholder="****" />
-        <div className="flex gap-4"><Button variant="ghost" className="flex-1" onClick={() => {setVista('inicio'); setPinInput("");}}>ATRÁS</Button><Button className="flex-1" onClick={validarPin}>INGRESAR</Button></div>
+        <div className="flex gap-4"><Button variant="ghost" className="flex-1" onClick={() => setVista('inicio')}>ATRÁS</Button><Button className="flex-1" onClick={validarPin}>INGRESAR</Button></div>
       </Card>
     </div>
   );
@@ -271,9 +239,9 @@ export default function DiagnosticoAutomatizado() {
     <div className="min-h-screen bg-emerald-50 flex items-center justify-center p-6 text-center">
       <Card className="max-w-md w-full py-20 border-t-[16px] border-emerald-500">
         <CheckCircle2 size={120} className="text-emerald-500 mx-auto animate-bounce" />
-        <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">¡Envío Exitoso!</h2>
-        <p className="text-xl text-slate-500 font-bold px-4 mb-8 italic">Tus datos han sido registrados correctamente en el Excel.</p>
-        <Button className="w-full h-20 text-xl shadow-2xl" onClick={() => window.location.reload()}>FINALIZAR Y SALIR</Button>
+        <h2 className="text-4xl font-black text-slate-800 uppercase italic">¡REGISTRO EXITOSO!</h2>
+        <p className="text-xl text-slate-500 font-bold mb-8 italic">Muchas gracias por participar.</p>
+        <Button className="w-full h-20" onClick={() => window.location.reload()}>FINALIZAR</Button>
       </Card>
     </div>
   );
@@ -281,11 +249,8 @@ export default function DiagnosticoAutomatizado() {
   return (
     <div className="min-h-screen bg-slate-100 py-12 px-4">
       <div className="max-w-3xl mx-auto shadow-2xl rounded-[50px] overflow-hidden">
-        <div className="bg-[#1e3a8a] text-white px-10 py-6 flex justify-between items-center border-b-4 border-blue-400">
-            <div className="flex flex-col font-black">
-                <span className="uppercase italic tracking-widest">{rolSel}</span>
-                <span className="text-xs text-blue-200 uppercase">{instInput}</span>
-            </div>
+        <div className="bg-[#1e3a8a] text-white px-10 py-6 flex justify-between items-center">
+            <span className="font-black uppercase tracking-widest">{rolSel} - {instInput}</span>
             <span className="bg-white/20 px-6 py-2 rounded-full text-sm font-bold tracking-tighter">Faltan: {ACCESO[rolSel!].total - respondidas}</span>
         </div>
         <Card className="rounded-t-none p-12">
@@ -294,8 +259,7 @@ export default function DiagnosticoAutomatizado() {
             {rolSel === 'Docentes' && <FormDocentes r={respuestas} g={guardar} />}
             {rolSel === 'Padres' && <FormPadres r={respuestas} g={guardar} />}
             {rolSel === 'Estudiantes' && <FormEstudiantes r={respuestas} g={guardar} />}
-            <div className="pt-12 border-t-8 border-slate-50">
-              {incompleto && <div className="text-center text-orange-600 font-black mb-8 animate-pulse uppercase"><AlertCircle size={24}/> Completa todas las preguntas (*)</div>}
+            <div className="pt-12">
               <Button disabled={incompleto || enviando} type="submit" className="w-full h-28 text-3xl uppercase tracking-tighter shadow-2xl">{enviando ? <Loader2 className="animate-spin" size={48} /> : "Finalizar y Enviar"}</Button>
             </div>
           </form>
@@ -308,7 +272,7 @@ export default function DiagnosticoAutomatizado() {
 function RoleBtn({ icon, label, onClick, color }: any) {
   return (
     <button onClick={onClick} className={`bg-white p-12 rounded-[60px] shadow-lg border-b-[16px] transition-all hover:shadow-2xl hover:-translate-y-4 flex flex-col items-center gap-6 ${color}`}>
-      <div className="text-slate-300 transition-colors">{icon}</div>
+      <div className="text-slate-300">{icon}</div>
       <span className="font-black text-slate-700 text-xl uppercase italic tracking-tighter">{label}</span>
     </button>
   );

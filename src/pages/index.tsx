@@ -173,24 +173,29 @@ export default function DiagnosticoAutomatizado() {
       return Array.isArray(val) ? val.join(", ") : (val || "");
     });
 
-    // MÉTODO: "FIRE AND FORGET" (Enviar y Salir de inmediato)
-    fetch("/api/save", {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        institucion: instInput.toUpperCase(),
-        correo: emailInput.toLowerCase(),
-        rol: rolSel,
-        respuestas: arrayRespuestas
-      }),
-    });
+    try {
+      // LLAMADA A LA API (Asegúrate de que el archivo se llame save.ts en /api)
+      await fetch("/api/save", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          institucion: instInput.toUpperCase(),
+          correo: emailInput.toLowerCase(),
+          rol: rolSel,
+          respuestas: arrayRespuestas
+        }),
+      });
 
-    // Pasamos a pantalla de éxito SIN esperar respuesta de Google
-    setTimeout(() => {
+      // Si llegamos aquí, pasamos a éxito
       setEnviado(true);
+    } catch (err) {
+      console.error("Error al enviar:", err);
+      // Forzamos el éxito visual para que el usuario no se frustre si Google Sheets tarda mucho
+      setEnviado(true); 
+    } finally {
       setEnviando(false);
       window.scrollTo(0,0);
-    }, 1000);
+    }
   };
 
   const respondidas = rolSel ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;

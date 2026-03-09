@@ -143,7 +143,7 @@ const FormEstudiantes = ({r, g}: any) => (
     <Question label="9. Gracias a los centros, he mejorado mis relaciones con otros estudiantes." id="e9" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
     <Question label="10. En general, ¿qué tan bueno es el impacto de los centros para ti?" id="e10" options={["Muy bueno", "Bueno", "Regular", "Malo"]} respuestas={r} onCheck={g} />
     <Question label="11. ¿En la escuela nos dan tiempo y espacio suficiente para los centros?" id="e11" options={["Sí, horario normal", "Sí, otro horario", "Sí, en ambos", "No dan suficiente"]} respuestas={r} onCheck={g} />
-    <Question label="12. ¿Afecta negativamente otras materias cuando hacemos los centros?" id="e12" options={["Mucho (me perjudica)", "Algo", "Poco", "Nada (no afecta)"]} respuestas={r} onCheck={g} />
+    <Question label="12. ¿Afecta negativamente otras materias cuando hacemos los centros?" id="e12" options={["Mucho (me perjudica)", "Algo", "Poco", "Nada (not afecta)"]} respuestas={r} onCheck={g} />
   </>
 );
 
@@ -151,7 +151,7 @@ const FormEstudiantes = ({r, g}: any) => (
 export default function DiagnosticoAutomatizado() {
   const [vista, setVista] = useState<'colegio' | 'inicio' | 'login' | 'encuesta' | 'dashboard'>('colegio');
   const [instInput, setInstInput] = useState("");
-  const [emailInput, setEmailInput] = useState(""); // NUEVO CAMPO
+  const [emailInput, setEmailInput] = useState("");
   const [rolSel, setRolSel] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState("");
   const [errorPin, setErrorPin] = useState(false);
@@ -171,22 +171,50 @@ export default function DiagnosticoAutomatizado() {
   const manejarEnvio = async (e: React.FormEvent) => {
     e.preventDefault();
     setEnviando(true);
+    
+    // Convertimos el objeto de respuestas en un array ordenado para el Excel
+    const idsOrdenados = ACCESO[rolSel!].ids;
+    const arrayRespuestas = idsOrdenados.map((id: string) => {
+      const val = respuestas[id];
+      return Array.isArray(val) ? val.join(", ") : val;
+    });
+
     try {
-      const response = await fetch("https://hook.us2.make.com/cwetc1ylcf4utmi1tqzk2nslpign89a8", {
+      const response = await fetch("/api/save", { // LLAMADA A TU API DE GOOGLE
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          institucion: instInput.toUpperCase(),
+          correo: emailInput.toLowerCase(),
+          rol: rolSel,
+          respuestas: arrayRespuestas
+        }),
+      });
+
+      // También enviamos a Make por si quieres mantener ambos
+      await fetch("https://hook.us2.make.com/cwetc1ylcf4utmi1tqzk2nslpign89a8", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fecha: new Date().toLocaleString('es-CO'),
           institucion: instInput.toUpperCase(),
-          email: emailInput.toLowerCase(), // SE ENVÍA EL EMAIL A MAKE
+          email: emailInput.toLowerCase(),
           rol: rolSel,
           datos: respuestas
         }),
       });
-      if (response.ok) { setEnviado(true); window.scrollTo(0,0); }
-      else throw new Error();
-    } catch { alert("Error de conexión. Revisa tu internet."); }
-    finally { setEnviando(false); }
+
+      if (response.ok) { 
+        setEnviado(true); 
+        window.scrollTo(0,0); 
+      } else {
+        throw new Error();
+      }
+    } catch { 
+      alert("Error al guardar. Verifica tu conexión."); 
+    } finally { 
+      setEnviando(false); 
+    }
   };
 
   const respondidas = rolSel && rolSel !== 'Admin' ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;
@@ -194,7 +222,7 @@ export default function DiagnosticoAutomatizado() {
 
   const emailValido = emailInput.includes("@") && emailInput.includes(".");
 
-  // --- VISTA 0: IDENTIFICACIÓN (COLEGIO Y EMAIL) ---
+  // --- VISTA 0: IDENTIFICACIÓN ---
   if (vista === 'colegio') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
       <Card className="max-w-2xl w-full space-y-10 py-16 border-t-[12px] border-[#1e3a8a]">
@@ -205,13 +233,11 @@ export default function DiagnosticoAutomatizado() {
         </div>
         
         <div className="space-y-6 max-w-lg mx-auto">
-            {/* Campo Institución */}
             <div className="relative">
                 <Keyboard className="absolute left-5 top-6 text-blue-300" size={24} />
                 <input type="text" value={instInput} onChange={(e) => setInstInput(e.target.value)} placeholder="NOMBRE DE LA INSTITUCIÓN..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 uppercase transition-all shadow-inner bg-slate-50" />
             </div>
 
-            {/* Campo Email */}
             <div className="relative">
                 <Mail className="absolute left-5 top-6 text-blue-300" size={24} />
                 <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="CORREO ELECTRÓNICO INSTITUCIONAL..." className="w-full pl-14 pr-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 transition-all shadow-inner bg-slate-50" />

@@ -1,7 +1,10 @@
 import { google } from 'googleapis';
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
+
   const { institucion, correo, rol, respuestas } = req.body;
 
   try {
@@ -18,20 +21,20 @@ export default async function handler(req: any, res: any) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     
-    // FILA DE DATOS (Asegurando 16 columnas: A hasta P)
-    const fila = [
-      new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }), // A: Fecha
-      institucion, // B: Institución
-      correo,      // C: Correo
-      rol,         // D: Rol
-      ...respuestas // E hasta P: Preguntas (12 campos)
-    ];
+    // Armamos la fila exactamente para columnas A hasta P (16 campos)
+    const values = [[
+      new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+      institucion,
+      correo,
+      rol,
+      ...respuestas
+    ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
-      range: "'Hoja 1'!A:P", // RANGO EXACTO
+      range: "'Hoja 1'!A:P",
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [fila] },
+      requestBody: { values },
     });
 
     return res.status(200).json({ success: true });

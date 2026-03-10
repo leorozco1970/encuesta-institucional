@@ -18,8 +18,6 @@ export default async function handler(req: any, res: any) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    // Rango EXACTO de tu hoja (A1 hasta P2000)
     const resSheet = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
       range: "'Hoja 1'!A1:P2000",
@@ -27,14 +25,14 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
     
-    // BUSQUEDA SIMPLE (Como en el diagnóstico que SÍ funcionó)
-    const busqueda = nombreInstitucion.toLowerCase().trim();
-    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(busqueda));
+    // BÚSQUEDA SIMPLE: Buscamos si la palabra escrita está dentro del nombre del Excel
+    const query = nombreInstitucion.toLowerCase().trim();
+    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(query));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
-    // --- PROCESAMIENTO DE DATOS ---
-    const conteo = {
+    // --- PROCESAMIENTO ---
+    const estamentos = {
       Directivos: datos.filter(f => f[3]?.toLowerCase().includes('directivo')).length,
       Docentes: datos.filter(f => f[3]?.toLowerCase().includes('docente')).length,
       Estudiantes: datos.filter(f => f[3]?.toLowerCase().includes('estudiante')).length,
@@ -42,38 +40,37 @@ export default async function handler(req: any, res: any) {
     };
 
     const puntaje = (v: string) => {
-      const m: any = { "Mucho": 100, "Siempre": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
+      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
       return m[v] || 0;
     };
 
-    const calcularFavorabilidad = (rol: string, col: number) => {
-      const sub = datos.filter(f => f[3]?.toLowerCase().includes(rol));
+    const calcularEje = (rolKey: string, col: number) => {
+      const sub = datos.filter(f => f[3]?.toLowerCase().includes(rolKey));
       if (sub.length === 0) return "N/A";
-      let suma = 0, count = 0;
-      sub.forEach(f => { if (f[col]) { suma += puntaje(f[col]); count++; } });
-      return count > 0 ? (suma / count).toFixed(1) + "%" : "0.0%";
+      let suma = 0, cont = 0;
+      sub.forEach(f => { if (f[col]) { suma += puntaje(f[col]); cont++; } });
+      return cont > 0 ? (suma / cont).toFixed(1) + "%" : "0.0%";
     };
 
-    // --- GENERACIÓN DEL PDF PROFESIONAL ---
+    // --- PDF ---
     const doc = new jsPDF();
     const azul = [30, 58, 138];
     doc.setFillColor(azul[0], azul[1], azul[2]); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 25, { align: "center" });
-
+    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 22, { align: "center" });
+    
     doc.setTextColor(0,0,0); doc.setFontSize(11);
-    doc.text(`Institución: ${datos[0][1]}`, 20, 50);
+    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 50);
 
     (doc as any).autoTable({
       startY: 60,
-      head: [['Estamento', 'Participantes']],
-      body: [['Directivos', conteo.Directivos], ['Docentes', conteo.Docentes], ['Estudiantes', conteo.Estudiantes], ['Padres', conteo.Padres], ['TOTAL', datos.length]],
+      head: [['Estamento', 'Cant. Participantes']],
+      body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
       theme: 'grid'
     });
 
-    // Mapeo de Ejes según tus Columnas (P2=5, P3=6, P4=7, P6=9)
     const ejes = [
       { t: "EJE 1: CONVIVENCIA", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
-      { t: "EJE 2: CRESE", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 2: CRESE (SOCIOEMOCIONAL)", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
       { t: "EJE 3: TERRITORIO", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
       { t: "EJE 4: CENTROS DE INTERÉS", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
     ];
@@ -83,9 +80,9 @@ export default async function handler(req: any, res: any) {
       doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
       (doc as any).autoTable({ 
         startY: y + 5, 
-        head: [['Actor Educativo', 'Favorabilidad']], 
-        body: e.r.map(r => [r[0], calcularFavorabilidad(r[1], e.col)]),
-        headStyles: { fillColor: azul } 
+        head: [['Actor', 'Favorabilidad']], 
+        body: e.r.map(r => [r[0], calcularEje(r[1], e.col)]),
+        headStyles: { fillColor: azul }
       });
       y = (doc as any).lastAutoTable.finalY + 15;
     });
@@ -95,7 +92,7 @@ export default async function handler(req: any, res: any) {
       from: '"PTA/FI 3.0" <leorozco1970@gmail.com>',
       to: destinoCorreo,
       subject: `📊 Informe Final: ${nombreInstitucion}`,
-      attachments: [{ filename: `Informe_Diagnostico.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
+      attachments: [{ filename: `Informe.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
     });
 
     res.status(200).json({ ok: true });

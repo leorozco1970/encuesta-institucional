@@ -18,70 +18,74 @@ export default async function handler(req: any, res: any) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const resSheet = await sheets.spreadsheets.values.get({
+    const response = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
       range: "'Hoja 1'!A1:P2000",
     });
 
-    const filas = resSheet.data.values || [];
+    const rows = response.data.values || [];
     
-    // LIMPIEZA TOTAL: Quita todo lo que no sea letra o número (incluso saltos de línea)
-    const limpiar = (t: string) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
-    const busqueda = limpiar(nombreInstitucion);
+    // LIMPIEZA TOTAL: Quita tildes, saltos de línea y caracteres especiales
+    const clean = (t: string) => 
+      t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
 
-    // Filtra en columna B (índice 1) buscando si la palabra está CONTENIDA
-    const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
+    const query = clean(nombreInstitucion);
+    
+    // Buscamos en Columna B (índice 1)
+    const datos = rows.filter(row => row[1] && clean(row[1]).includes(query));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
-    // --- CONTEO Y CÁLCULOS PROFESIONALES ---
-    const estamentos = {
-      Directivos: datos.filter(f => limpiar(f[3]).includes('directivo')).length,
-      Docentes: datos.filter(f => limpiar(f[3]).includes('docente')).length,
-      Estudiantes: datos.filter(f => limpiar(f[3]).includes('estudiante')).length,
-      Padres: datos.filter(f => limpiar(f[3]).includes('padre')).length
+    // --- CÁLCULOS PROFESIONALES ---
+    const conteo = {
+      Directivos: datos.filter(f => clean(f[3]).includes('directivo')).length,
+      Docentes: datos.filter(f => clean(f[3]).includes('docente')).length,
+      Estudiantes: datos.filter(f => clean(f[3]).includes('estudiante')).length,
+      Padres: datos.filter(f => clean(f[3]).includes('padre')).length
     };
 
     const puntaje = (v: string) => {
-      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
+      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Muy positivo": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
       return m[v] || 0;
     };
 
-    const calcularFavorabilidad = (rolKey: string, col: number) => {
-      const sub = datos.filter(f => limpiar(f[3]).includes(rolKey));
+    const calcularEje = (rolKey: string, col: number) => {
+      const sub = datos.filter(f => clean(f[3]).includes(rolKey));
       if (sub.length === 0) return "N/A";
       let suma = 0, count = 0;
       sub.forEach(f => { if (f[col]) { suma += puntaje(f[col]); count++; } });
       return count > 0 ? (suma / count).toFixed(1) + "%" : "0.0%";
     };
 
+    // --- PDF ESTRUCTURADO ---
     const doc = new jsPDF();
     const azul = [30, 58, 138];
-    doc.setFillColor(azul[0], azul[1], azul[2]); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 25, { align: "center" });
-
-    doc.setTextColor(0,0,0); doc.setFontSize(11);
-    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 50);
+    doc.setFillColor(azul[0], azul[1], azul[2]); doc.rect(0, 0, 210, 45, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO INSTITUCIONAL PTA/FI 3.0", 105, 25, { align: "center" });
+    
+    doc.setTextColor(0,0,0);
+    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 55);
 
     (doc as any).autoTable({
-      startY: 60,
-      head: [['Estamento', 'Participantes']],
-      body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
+      startY: 70,
+      head: [['Muestra', 'Participantes']],
+      body: [['Directivos', conteo.Directivos], ['Docentes', conteo.Docentes], ['Estudiantes', conteo.Estudiantes], ['Padres', conteo.Padres], ['TOTAL', datos.length]],
       theme: 'grid'
     });
 
+    // Mapeo según tu imagen (Columnas F, G, H, J)
     const ejes = [
-      { t: "EJE 1: CONVIVENCIA", p: "Clima y bienestar escolar.", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
-      { t: "EJE 2: CRESE", p: "Desarrollo socioemocional.", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 3: TERRITORIO", p: "Contexto comunitario.", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 4: CENTROS DE INTERÉS", p: "Talentos y formación.", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
+      { t: "EJE 1: CONVIVENCIA", p: "Clima escolar.", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
+      { t: "EJE 2: CRESE", p: "Socioemocional.", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 3: TERRITORIO", p: "Vínculo local.", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 4: CENTROS DE INTERÉS", p: "Talentos.", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
     ];
 
-    let y = (doc as any).lastAutoTable.finalY + 15;
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
     ejes.forEach(e => {
-      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
-      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: e.r.map(r => [r[0], calcularFavorabilidad(r[1], e.col)]), headStyles: { fillColor: azul } });
-      y = (doc as any).lastAutoTable.finalY + 15;
+      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, currentY);
+      (doc as any).autoTable({ startY: currentY + 5, head: [['Actor', 'Favorabilidad']], body: e.r.map(r => [r[0], calcularEje(r[1], e.col)]), headStyles: { fillColor: azul } });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     });
 
     const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });

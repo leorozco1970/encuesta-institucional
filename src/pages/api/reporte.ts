@@ -1,13 +1,9 @@
 import { google } from 'googleapis';
 // @ts-ignore
 import nodemailer from 'nodemailer';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
   const { nombreInstitucion, destinoCorreo } = req.body;
-
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -18,96 +14,24 @@ export default async function handler(req: any, res: any) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    // CAMBIO VITAL: Rango amplio en la Hoja 1
-    const resSheet = await sheets.spreadsheets.values.get({
+    const response = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
-      range: "'Hoja 1'!A1:Z2000",
+      range: "'Hoja 1'!A1:B100", // Leemos solo los nombres para diagnosticar
     });
 
-    const filas = resSheet.data.values || [];
-    
-    // Limpieza agresiva de texto
-    const normalizar = (t: string) => 
-      t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
-
-    const query = normalizar(nombreInstitucion);
-    
-    // Búsqueda flexible en columna B (índice 1)
-    const datos = filas.filter(f => f[1] && normalizar(f[1]).includes(query));
-
-    // SI NO HAY DATOS, enviamos un email de diagnóstico técnico
-    if (datos.length === 0) {
-      const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
-      await transporter.sendMail({
-        from: '"Soporte Técnico" <leorozco1970@gmail.com>',
-        to: destinoCorreo,
-        subject: "⚠️ Alerta de Sistema: Fallo de Búsqueda",
-        text: `El sistema no encontró: "${nombreInstitucion}". 
-               Total de filas leídas: ${filas.length}. 
-               Ejemplo fila 2: ${JSON.stringify(filas[1])}`
-      });
-      return res.status(404).json({ error: 'No se encontraron datos. Revisa tu email para ver el reporte de error.' });
-    }
-
-    // --- (GENERACIÓN DEL REPORTE PROFESIONAL DE 4 EJES - IGUAL AL ANTERIOR) ---
-    const conteo = {
-      Directivos: datos.filter(f => normalizar(f[3]).includes('directivo')).length,
-      Docentes: datos.filter(f => normalizar(f[3]).includes('docente')).length,
-      Estudiantes: datos.filter(f => normalizar(f[3]).includes('estudiante')).length,
-      Padres: datos.filter(f => normalizar(f[3]).includes('padre')).length
-    };
-
-    const puntaje = (v: string) => {
-      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
-      return m[v] || 0;
-    };
-
-    const calcularEje = (rolKey: string, col: number) => {
-      const sub = datos.filter(f => normalizar(f[3]).includes(rolKey));
-      if (sub.length === 0) return "N/A";
-      let suma = 0, cont = 0;
-      sub.forEach(f => { if (f[col]) { suma += puntaje(f[col]); cont++; } });
-      return cont > 0 ? (suma / cont).toFixed(1) + "%" : "0.0%";
-    };
-
-    const doc = new jsPDF();
-    const azul = [30, 58, 138];
-    doc.setFillColor(azul[0], azul[1], azul[2]); doc.rect(0, 0, 210, 40, 'F');
-    doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 25, { align: "center" });
-    
-    doc.setTextColor(0,0,0); doc.setFontSize(10);
-    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 50);
-
-    (doc as any).autoTable({
-      startY: 60,
-      head: [['Estamento', 'Participantes']],
-      body: [['Directivos', conteo.Directivos], ['Docentes', conteo.Docentes], ['Estudiantes', conteo.Estudiantes], ['Padres', conteo.Padres]],
-      theme: 'grid'
-    });
-
-    const ejes = [
-      { t: "EJE 1: CONVIVENCIA", p: "Bienestar y clima escolar.", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
-      { t: "EJE 2: CRESE", p: "Desarrollo socioemocional.", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 3: TERRITORIO", p: "Contexto comunitario.", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 4: CENTROS DE INTERÉS", p: "Talentos y formación.", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
-    ];
-
-    let y = (doc as any).lastAutoTable.finalY + 15;
-    ejes.forEach(e => {
-      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
-      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: e.r.map(r => [r[0], calcularEje(r[1], e.col)]), headStyles: { fillColor: azul } });
-      y = (doc as any).lastAutoTable.finalY + 15;
-    });
+    const filas = response.data.values || [];
+    const listaNombres = filas.map(f => f[1]).join(" | ");
 
     const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
     await transporter.sendMail({
-      from: '"PTA/FI 3.0" <leorozco1970@gmail.com>',
+      from: '"Diagnóstico Soporte" <leorozco1970@gmail.com>',
       to: destinoCorreo,
-      subject: `📊 Informe Final: ${nombreInstitucion}`,
-      attachments: [{ filename: `Informe.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
+      subject: "🔍 Reporte de Diagnóstico de Datos",
+      text: `Hola Camilo. El robot entró al Excel y leyó estos nombres: ${listaNombres}. ¿Ves el tuyo ahí?`
     });
 
-    res.status(200).json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+    res.status(200).json({ ok: true, msg: "Revisa tu correo con el diagnóstico." });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   UserCircle, Users, BookOpen, GraduationCap, Lock, 
-  CheckCircle2, Check, Loader2, School, ChevronRight
+  CheckCircle2, Check, Loader2, School, FileText 
 } from 'lucide-react';
 
 // --- 1. CONFIGURACIÓN DE ACCESO ---
@@ -114,7 +114,7 @@ const FormPadres = ({r, g}: any) => (
     <Question label="3. Mi hijo(a) participa en los centros de interés." id="p3" options={["Siempre", "A veces", "Casi nunca", "No sé"]} respuestas={r} onCheck={g} />
     <Question label="4. El tiempo que mi hijo(a) pasa en los centros de interés se aprovecha bien." id="p4" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
     <Question label="5. Los centros de interés favorecen el bienestar y la convivencia de mi hijo(a)." id="p5" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
-    <MultiSelect label="6. ¿En qué ha notado mayor cambio positivo en su hijo(a)?" id="p6" options={["Manejo emociones", "Comportamiento", "Responsabilidad", "Motivación estudiar", "Relaciones sociales", "Habilidades creativas"]} respuestas={r} onCheck={g} />
+    <MultiSelect label="6. ¿En qué ha notado mayor cambio positivo en su hijo(a)?" id="p6" options={["Manejo emociones", "Comportamiento", "Responsabilidad", "Motivación estudiar", "Relaciones sociales", "Habilidades creativeas"]} respuestas={r} onCheck={g} />
     <Question label="7. La escuela tiene en cuenta el contexto familiar y territorial." id="p7" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
     <Question label="8. Los centros de interés han aumentado el interés por asistir a la escuela." id="p8" options={["Mucho", "Algo", "Poco", "Nada"]} respuestas={r} onCheck={g} />
     <Question label="9. Mi hijo(a) ha adquirido nuevas habilidades o conocimientos." id="p9" options={["Muchas", "Algunas", "Pocas", "Ninguna"]} respuestas={r} onCheck={g} />
@@ -150,6 +150,7 @@ export default function DiagnosticoAutomatizado() {
   const [respuestas, setRespuestas] = useState<Record<string, any>>({});
   const [enviado, setEnviado] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [generandoReporte, setGenerandoReporte] = useState(false);
 
   const guardar = (id: string, valor: any) => setRespuestas(prev => ({ ...prev, [id]: valor }));
 
@@ -195,6 +196,28 @@ export default function DiagnosticoAutomatizado() {
     }
   };
 
+  // FUNCIÓN PARA EL REPORTE MAESTRO
+  const dispararReporte = async () => {
+    const inst = prompt("Nombre exacto de la institución a reportar:");
+    const mail = prompt("Correo donde enviar el PDF:");
+    if(!inst || !mail) return;
+
+    setGenerandoReporte(true);
+    try {
+      const res = await fetch('/api/reporte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombreInstitucion: inst, destinoCorreo: mail })
+      });
+      if(res.ok) alert("¡Reporte generado y enviado con éxito!");
+      else alert("No se encontraron datos para esa institución.");
+    } catch (e) {
+      alert("Error de conexión con el motor de reportes.");
+    } finally {
+      setGenerandoReporte(false);
+    }
+  };
+
   const respondidas = rolSel ? ACCESO[rolSel].ids.filter((id: string) => respuestas[id] && (Array.isArray(respuestas[id]) ? respuestas[id].length > 0 : true)).length : 0;
   const incompleto = rolSel ? respondidas < ACCESO[rolSel].total : true;
 
@@ -209,6 +232,15 @@ export default function DiagnosticoAutomatizado() {
         </div>
         <Button disabled={instInput.trim().length < 5 || !emailInput.includes("@")} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20">CONTINUAR</Button>
       </Card>
+      
+      {/* BOTÓN SECRETO PARA CAMILO */}
+      <button 
+        onClick={dispararReporte}
+        className="fixed bottom-6 right-6 bg-slate-800 text-white px-6 py-4 rounded-full shadow-2xl opacity-40 hover:opacity-100 transition-all flex items-center gap-3 font-bold"
+      >
+        {generandoReporte ? <Loader2 className="animate-spin"/> : <FileText size={20}/>}
+        {generandoReporte ? "PROCESANDO..." : "GENERAR REPORTE PDF"}
+      </button>
     </div>
   );
 

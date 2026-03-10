@@ -20,83 +20,142 @@ export default async function handler(req: any, res: any) {
     const sheets = google.sheets({ version: 'v4', auth });
     const resSheet = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
-      range: 'A:P', 
+      range: 'A:P',
     });
 
     const filas = resSheet.data.values || [];
-    const limpiar = (t: string) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-    const busqueda = limpiar(nombreInstitucion);
+    const normalizar = (t: string) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+    const busqueda = normalizar(nombreInstitucion);
 
-    // FILTRO: Buscamos en la Columna B (índice 1)
-    const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
+    // Filtrado de datos (Columna B = índice 1)
+    const datos = filas.filter(f => f[1] && normalizar(f[1]).includes(busqueda));
 
-    if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
+    if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos para esta institución.' });
 
-    // CONTEO: Usamos la Columna D (índice 3) para los Roles
+    // Conteo de Participantes (Columna D = índice 3)
     const conteo = {
-      Directivos: datos.filter(f => limpiar(f[3]) === 'directivos').length,
-      Docentes: datos.filter(f => limpiar(f[3]) === 'docentes').length,
-      Estudiantes: datos.filter(f => limpiar(f[3]) === 'estudiantes').length,
-      Padres: datos.filter(f => limpiar(f[3]) === 'padres').length
+      Directivos: datos.filter(f => normalizar(f[3]).includes('directivo')).length,
+      Docentes: datos.filter(f => normalizar(f[3]).includes('docente')).length,
+      Estudiantes: datos.filter(f => normalizar(f[3]).includes('estudiante')).length,
+      Padres: datos.filter(f => normalizar(f[3]).includes('padre')).length
     };
 
     const puntaje = (v: string) => {
-      const m: any = { "Mucho": 100, "Siempre": 100, "Algo": 75, "Casi siempre": 75, "Poco": 50, "A veces": 50, "Nada": 25, "Nunca": 25 };
+      const m: any = { "Mucho": 100, "Siempre": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
       return m[v] || 0;
     };
 
-    const calcularEje = (rol: string, offset: number) => {
-      const sub = datos.filter(f => limpiar(f[3]) === limpiar(rol));
-      if (sub.length === 0) return "0.0%";
-      // Las respuestas empiezan en Columna E (índice 4)
-      const val = sub[0][offset + 4];
-      return val ? puntaje(val).toFixed(1) + "%" : "0.0%";
+    const calcularEje = (rolKeyword: string, colIndex: number) => {
+      const sub = datos.filter(f => normalizar(f[3]).includes(rolKeyword));
+      if (sub.length === 0) return "N/A";
+      let suma = 0, cont = 0;
+      sub.forEach(f => {
+        if (f[colIndex]) { suma += puntaje(f[colIndex]); cont++; }
+      });
+      return cont > 0 ? (suma / cont).toFixed(1) + "%" : "0.0%";
     };
 
     const doc = new jsPDF();
     const azul = [30, 58, 138];
+
+    // --- ENCABEZADO ---
     doc.setFillColor(azul[0], azul[1], azul[2]);
-    doc.rect(0, 0, 210, 40, 'F');
+    doc.rect(0, 0, 210, 45, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18); doc.text("INFORME DIAGNÓSTICO PTA/FI 3.0", 105, 25, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("INFORME DIAGNÓSTICO INSTITUCIONAL PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.setFontSize(11);
+    doc.text("ANÁLISIS DE PERCEPCIÓN Y TRIANGULACIÓN DE ACTORES", 105, 30, { align: "center" });
 
-    doc.setTextColor(0, 0, 0); doc.setFontSize(10);
-    doc.text(`Institución: ${datos[0][1]}`, 20, 55);
+    // --- SECCIÓN 1: PROPÓSITO ---
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.text("1. PROPÓSITO DEL DIAGNÓSTICO", 20, 55);
+    doc.setFont("helvetica", "normal");
+    const proposito = "Este informe técnico automatizado busca consolidar y comparar las visiones de directivos, docentes, estudiantes y padres sobre la realidad institucional. Los resultados permiten fundamentar la toma de decisiones pedagógicas y fortalecer la ruta de acompañamiento territorial.";
+    doc.text(doc.splitTextToSize(proposito, 170), 20, 62);
 
+    // --- SECCIÓN 2: MUESTRA ---
+    doc.setFont("helvetica", "bold");
+    doc.text(`2. MUESTRA PARTICIPATIVA: ${nombreInstitucion.toUpperCase()}`, 20, 85);
     (doc as any).autoTable({
-      startY: 65,
-      head: [['Muestra', 'Directivos', 'Docentes', 'Estudiantes', 'Padres', 'TOTAL']],
-      body: [['Cantidades', conteo.Directivos, conteo.Docentes, conteo.Estudiantes, conteo.Padres, datos.length]],
-      theme: 'grid'
+      startY: 90,
+      head: [['Estamento', 'Participantes', 'Representatividad']],
+      body: [
+        ['Directivos', conteo.Directivos, 'Alta'],
+        ['Docentes', conteo.Docentes, 'Media/Alta'],
+        ['Estudiantes', conteo.Estudiantes, 'Alta'],
+        ['Padres', conteo.Padres, 'Media'],
+        ['TOTAL REGISTROS', datos.length, '100%']
+      ],
+      headStyles: { fillColor: [100, 100, 100] }
     });
 
+    // --- SECCIÓN 3: EJES DE ANÁLISIS ---
     const configEjes = [
-      { t: "EJE 1: CONVIVENCIA", off: 4, r: ['Directivos','Docentes','Padres','Estudiantes'] },
-      { t: "EJE 2: SOCIOEMOCIONAL", off: 1, r: ['Directivos','Docentes','Estudiantes'] },
-      { t: "EJE 3: TERRITORIO", off: 5, r: ['Directivos','Docentes','Estudiantes'] },
-      { t: "EJE 4: CENTROS DE INTERÉS", off: 2, r: ['Directivos','Docentes','Estudiantes'] }
+      { 
+        t: "EJE 1: CONVIVENCIA Y CLIMA ESCOLAR", 
+        p: "Analiza la seguridad emocional, el respeto mutuo y el sentido de bienestar dentro de la comunidad educativa.", 
+        col: 7, // Columna H
+        roles: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante'], ['Padres','padre']]
+      },
+      { 
+        t: "EJE 2: DESARROLLO SOCIOEMOCIONAL (CRESE)", 
+        p: "Mide la capacidad de la institución para integrar el manejo de emociones y competencias ciudadanas.", 
+        col: 4, // Columna E
+        roles: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']]
+      },
+      { 
+        t: "EJE 3: PERTINENCIA TERRITORIAL", 
+        p: "Evalúa qué tanto el currículo y las prácticas pedagógicas responden a la realidad del contexto barrial.", 
+        col: 9, // Columna J
+        roles: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']]
+      },
+      { 
+        t: "EJE 4: CENTROS DE INTERÉS", 
+        p: "Focaliza en la efectividad de los espacios de formación complementaria y el desarrollo de talentos.", 
+        col: 5, // Columna F
+        roles: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']]
+      }
     ];
 
-    let y = (doc as any).lastAutoTable.finalY + 10;
-    configEjes.forEach(eje => {
-      doc.setFont("helvetica", "bold"); doc.text(eje.t, 20, y);
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+
+    configEjes.forEach((eje) => {
+      if (currentY > 230) { doc.addPage(); currentY = 25; }
+      
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(eje.t, 20, currentY);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(eje.p, 170), 20, currentY + 5);
+
       (doc as any).autoTable({
-        startY: y + 2,
-        head: [['Triangulación por Rol', 'Índice de Percepción']],
-        body: eje.r.map(rol => [rol, calcularEje(rol, eje.off)]),
-        headStyles: { fillColor: azul }
+        startY: currentY + 10,
+        head: [['Actor Educativo (Triangulación)', 'Índice de Favorabilidad']],
+        body: eje.roles.map(r => [r[0], calcularEje(r[1], eje.col)]),
+        headStyles: { fillColor: azul },
+        margin: { left: 20 },
+        styles: { fontSize: 10 }
       });
-      y = (doc as any).lastAutoTable.finalY + 12;
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     });
 
-    const pdfOutput = Buffer.from(doc.output('arraybuffer'));
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
-    
+    // --- ENVÍO DE CORREO ---
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' }
+    });
+
     await transporter.sendMail({
-      from: '"PTA/FI 3.0" <leorozco1970@gmail.com>',
+      from: '"SISTEMA PTA/FI 3.0" <leorozco1970@gmail.com>',
       to: destinoCorreo,
-      subject: `📊 Informe Diagnóstico: ${nombreInstitucion}`,
-      attachments: [{ filename: `Informe_${nombreInstitucion}.pdf`, content: pdfOutput }]
+      subject: `📊 Diagnóstico Institucional: ${nombreInstitucion}`,
+      text: `Se adjunta el informe profesional de 4 ejes para ${nombreInstitucion}.`,
+      attachments: [{ filename: `Informe_Diagnostico_${nombreInstitucion}.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
     });
 
     res.status(200).json({ ok: true });

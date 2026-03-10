@@ -81,3 +81,4 @@ export default async function handler(req: any, res: any) {
   }
 }
 // Reintento de construcción del reporte
+// Actualización de tipos para reporte

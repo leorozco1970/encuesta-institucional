@@ -25,11 +25,11 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
     
-    // LIMPIEZA TOTAL: Quita todo lo que no sea letra o número
+    // LIMPIEZA TOTAL: Quita todo lo que no sea letra o número (incluso saltos de línea)
     const limpiar = (t: string) => t ? t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
     const busqueda = limpiar(nombreInstitucion);
 
-    // Filtra en columna B (índice 1)
+    // Filtra en columna B (índice 1) buscando si la palabra está CONTENIDA
     const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
@@ -71,10 +71,10 @@ export default async function handler(req: any, res: any) {
     });
 
     const ejes = [
-      { t: "EJE 1: CONVIVENCIA", p: "Clima y bienestar.", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
-      { t: "EJE 2: CRESE", p: "Socioemocional.", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 3: TERRITORIO", p: "Vínculo local.", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 4: CENTROS DE INTERÉS", p: "Talentos.", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
+      { t: "EJE 1: CONVIVENCIA", p: "Clima y bienestar escolar.", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
+      { t: "EJE 2: CRESE", p: "Desarrollo socioemocional.", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 3: TERRITORIO", p: "Contexto comunitario.", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 4: CENTROS DE INTERÉS", p: "Talentos y formación.", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
     ];
 
     let y = (doc as any).lastAutoTable.finalY + 15;

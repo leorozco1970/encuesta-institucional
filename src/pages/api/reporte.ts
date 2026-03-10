@@ -12,7 +12,9 @@ export default async function handler(req: any, res: any) {
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: "sheets-save@encuesta-institucional-489716.iam.gserviceaccount.com",
-        private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC8+gPWgMiX1Ub6\nOhkIJ1du8OGIIGzSzl5+pg92z64HyxNjy5XgS5hFr78uEk6/+Q4jWkl3hWEnwpaU\n7YWkEmBm2XhNWiCCdZT1rReIjr4ZjL+HitqojkP+7w930aRzARXZ5Y/ejuZ0biGA\naM8jVxNWi5sbEnYD1QxdK2GMsdfm8i8ecbTslYJMwceg2Ekf6GUEoNi7o14oSrmh\n0L5A5MMawYurej8pIiRLBGkRxMDtz1ZIPe78EasXE9fAanU5b9o9bNKPDTiEI0yF\nd5h0ywDAsj92OPaDKGY3Uatz0Fy7+30NjQ7IN2RT91YtVQhdEI15XbYThy2+h/Nj\nNtAzDSL7AgMBAAECggEAEmtcvWckZibhJK74qqKfCI63r4Ytj+c9LviuUC/SRYCF\n6CJl/jc6uoF0pR/JXOKAfhyk8DPoHNvVbo2vitGfDiygkmA4WU7u+8/pF86F+UU5\nPpO1ArHfLyA2W0DsAlOhlsaj3RcDn7yY967/kEZtTvBg6A9xa6fel87h0riw6RnD\naBsKfTLpcdhvS7bRsnG3hxR29eH8GArCjislnikkyx57jlInkTS9M3Wi2LKdGskV\nuqMhTFIzkkfvcZvnXtX74fRXVk2ZT+UmYkAdDBmhqu3OYvWEHByhzYjtgBRaZP9L\n1quWufXVajAOVnc0UHsOjTLGRNAHiVzpDW+Mqlp7yQKBgQDlrDOP9SGyDkpx5A7Q\nQR2B03khtqGKUfDv8kuDH75AR0/hAWv/uVo/E4T6d34INNw3uqhGkYM7TvYSU1CA\ngiC228Rdg+oo/Oa9UAB0xNlYLJLHFq+4KtYGOWCclo4IMwsFTmgfC7s8meO0jkOS\noA1nYYMc9yb6xmEnV+UyVaR0aQKBgQDSo5QheGoz6OvzcdOaBB7JwHRb5+FwsBBU\nueRd9qHqBK4N8Nyhm92giBdBTZyzGIYXbIi4+Dt/Ia+xZJrLhYARtCOjxDzx/FWC\Tu1fTHlyKM5/OpwcJ6clbWJfQAoXTD4zvRwoQU0+jKUSzxrAx76Y4ZWYSt9LHOWY\sw25OjnfwwKBgHVERVd9e+Tj8xLPtNiURrKg/To/e5+aUwDQn8mljYhYYOqrxS7e\ vrtyBfW0yT77bm1t+rl9VpoTqQSWUYYr6vQypcJxtj+TUWTb0j/MuoSQzailZrcL\n+BdZeIC7Rm3dUgU1kWg4nzNEB8WK1empmu5sFXvWnapxW+2wrS/UFpHxAoGBAKHp\nK0wvCzOrrvMKY+TXlfLvBIJA04GTVHpMCcZQdlU0E7aTloSDEvD6qyV/Sxw/lZMb\n0lycMt+ePTbWZkZa7/6rwVl41oALvo7TrJK8bf3acCBMJQNfV5PlaOBekWMnMAkF\nLEelKoMSCTFUEPRulYtem2bc5pcON04RFFN09leRAoGBAMJPqPpB8DMabjGNnMtb\n2PUONmcm3p5VTUrR4RxWGlRVRc0cBLzf3SdHO7oJnuUiPhZPRaX1kWNQlZLOcax9\nEW9V8qMjD/pJoSzLkRgnU/IkSWpAE1uDvVWMANvrpfF4e3cC1tpo63t4/XpCkCCd\nWqYxjQAOKgIHnTddyMqGE0Ns\n-----END PRIVATE KEY-----\n".replace(/\\n/g, '\n'),
+        private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC8+gPWgMiX1Ub6\nOhkIJ1du8OGIIGzSzl5+pg92z64HyxNjy5XgS5hFr78uEk6/+Q4jWkl3hWEnwpaU\n7YWkEmBm2XhNWiCCdZT1rReIjr4ZjL+HitqojkP+7w930aRzARXZ5Y/ejuZ0biGA\naM8jVxNWi5sbEnYD1QxdK2GMsdfm8i8ecbTslYJMwceg2Ekf6GUEoNi7o14oSrmh\n0L5A5MMawYurej8pIiRLBGkRxMDtz1ZIPe78EasXE9fAanU5b9o9bNKPDTiEI0yF\nd5h0ywDAsj92OPaDKGY3Uatz0Fy7+30NjQ7IN2RT91YtVQhdEI15XbYThy2+h/Nj\nNtAzDSL7AgMBAAECggEAEmtcvWckZibhJK74qqKfCI63r4Ytj+c9LviuUC/SRYCF\n6CJl/jc6uoF0pR/JXOKAfhyk8DPoHNvVbo2vitGfDiygkmA4WU7u+8/pF86F+UU5\nPpO1ArHfLyA2W0DsAlOhlsaj3RcDn7yY967/kEZtTvBg6A9xa6fel87h0riw6RnD\naBsKfTLpcdhvS7bRsnG3hxR29eH8GArCjislnikkyx57jlInkTS9M3Wi2LKdGskV\nuqMhTFIzkkfvcZvnXtX74fRXVk2ZT+UmYkAdDBmhqu3OYvWEHByhzYjtgBRaZP9L\n1quWufXVajAOVnc0UHsOjTLGRNAHiVzpDW+Mqlp7yQKBgQDlrDOP9SGyDkpx5A7Q\nQR2B03khtqGKUfDv8kuDH75AR0/hAWv/uVo/E4T6d34INNw3uqhGkYM7TvYSU1CA\giC228Rdg+oo/Oa9UAB0xNlYLJLHFq+4KtYGOWCclo4IMwsFTmgfC7s8meO0jkOS\noA1nYYMc9yb6xmEnV+UyVaR0aQKBgQDSo5QheGoz6OvzcdOaBB7JwHRb5+FwsBBU\nueRd9qHqBK4N8Nyhm92giBdBTZyzGIYXbIi4+Dt/Ia+xZJrLhYARtCOjxDzx/FWC\Tu1fTHlyKM5/OpwcJ6clbWJfQAoXTD4zvRwoQU0+jKUSzxrAx76Y4ZWYSt9LHOWY\sw25OjnfwwKBgHVERVd9e+Tj8xLPtNiURrKg/To/e5+aUwDQn8mljYhYYOqrxS7e\ vrtyBfW0yT77bm1t+rl9VpoTqQSWUYYr6vQypcJxtj+TUWTb0j/MuoSQzailZrcL\n+BdZeIC7Rm3dUgU1kWg4nzNEB8WK1empmu5sFXvWnapxW+2wrS/UFpHxAoGBAKHp\nK0wvCzOrrvMKY+TXlfLvBIJA04GTVHpMCcZQdlU0E7aTloSDEvD6qyV/Sxw/lZMb\n0lycMt+ePTbWZkZa7/6rwVl41oALvo7TrJK8bf3acCBMJQNfV5PlaOBekWMnMAkF\nLEelKoMSCTFUEPRulYtem2bc5pcON04RFFN09leRAoGBAMJPqPpB8DMabjGNnMtb\n2PUONmcm3p5VTUrR4RxWGlRVRc0cBLzf3SdHO7oJnuUiPhZPRaX1kWNQlZLOcax9\nEW9V8qMjD/pJoSzLkRgnU/IkSWpAE1uDvVWMANvrpfF4e3cC1tpo63t4/XpCkCCd\nWqYxjQAOKgIHnTddyMqGE0Ns\n-----END PRIVATE KEY-----\n".replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
@@ -25,21 +27,83 @@ export default async function handler(req: any, res: any) {
     const datos = filas.filter(f => f[1] && f[1].toUpperCase() === nombreInstitucion.toUpperCase());
     if (datos.length === 0) return res.status(404).json({ error: 'Sin datos' });
 
-    const doc = new jsPDF();
-    doc.text(`INFORME: ${nombreInstitucion}`, 20, 20);
-    (doc as any).autoTable({ startY: 30, head: [['Rol', 'Cant']], body: [['Directivos', datos.filter(f => f[3]==='Directivos').length]] });
-    
-    const pdfBase64 = doc.output('datauristring').split(',')[1];
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
+    const puntaje = (v: string) => {
+      const m: any = { 
+        "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Muy positivo": 100, "Alto": 100, "Muy bueno": 100,
+        "Algo": 75, "Casi siempre": 75, "En gran parte": 75, "Positivo": 75, "Medio": 75, "Bueno": 75,
+        "Poco": 50, "A veces": 50, "Regular": 50, "Bajo": 50,
+        "Nada": 25, "Nunca": 25, "Negativo": 25, "Muy bajo": 25
+      };
+      return m[v] || 0;
+    };
 
-    await transporter.sendMail({
-      from: 'leorozco1970@gmail.com',
-      to: destinoCorreo,
-      subject: `Reporte ${nombreInstitucion}`,
-      text: 'Adjunto reporte PDF.',
-      attachments: [{ filename: 'reporte.pdf', content: pdfBase64, encoding: 'base64' }]
+    const calcularEje = (rol: string, indices: number[]) => {
+      const sub = datos.filter(f => f[3] === rol);
+      if (sub.length === 0) return "N/A";
+      let suma = 0, cont = 0;
+      sub.forEach(f => indices.forEach(idx => {
+        if (f[idx + 4]) { suma += puntaje(f[idx + 4]); cont++; }
+      }));
+      return cont > 0 ? (suma / cont).toFixed(1) + "%" : "0%";
+    };
+
+    const doc = new jsPDF();
+    const azul = [30, 58, 138];
+
+    // --- CABECERA ---
+    doc.setFillColor(azul[0], azul[1], azul[2]);
+    doc.rect(0, 0, 210, 45, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("INFORME DIAGNÓSTICO INSTITUCIONAL PTA/FI 3.0", 105, 25, { align: "center" });
+
+    // --- PROPÓSITO ---
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.text("PROPÓSITO DEL DIAGNÓSTICO:", 20, 55);
+    doc.setFont("helvetica", "italic");
+    const prop = "Comprender profundamente el contexto territorial, institucional y comunitario para fundamentar decisiones pedagógicas pertinentes.";
+    doc.text(doc.splitTextToSize(prop, 170), 20, 60);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text(`Institución: ${nombreInstitucion.toUpperCase()}`, 20, 75);
+
+    const configEjes = [
+      { t: "EJE 1: CONVIVENCIA Y CLIMA ESCOLAR", r: ['Directivos', 'Docentes', 'Padres', 'Estudiantes'], i: [4] },
+      { t: "EJE 2: DESARROLLO SOCIOEMOCIONAL (CRESE)", r: ['Directivos', 'Docentes', 'Estudiantes'], i: [1, 0] },
+      { t: "EJE 3: PERTINENCIA TERRITORIAL", r: ['Directivos', 'Docentes', 'Estudiantes'], i: [5] },
+      { t: "EJE 4: CENTROS DE INTERÉS", r: ['Directivos', 'Docentes', 'Estudiantes'], i: [2] }
+    ];
+
+    let currentY = 85;
+    configEjes.forEach((eje) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(eje.t, 20, currentY);
+      (doc as any).autoTable({
+        startY: currentY + 5,
+        head: [['Estamento', 'Índice de Percepción (%)']],
+        body: eje.r.map(rol => [rol, calcularEje(rol, eje.idx)]),
+        headStyles: { fillColor: azul }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     });
 
-    return res.status(200).json({ success: true });
-  } catch (e: any) { return res.status(500).json({ error: e.message }); }
+    const pdfOutput = Buffer.from(doc.output('arraybuffer'));
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' }
+    });
+
+    await transporter.sendMail({
+      from: '"PTA/FI 3.0" <leorozco1970@gmail.com>',
+      to: destinoCorreo,
+      subject: `📊 Informe Diagnóstico: ${nombreInstitucion}`,
+      text: `Se adjunta el informe de 4 ejes para ${nombreInstitucion}.`,
+      attachments: [{ filename: `Informe_${nombreInstitucion}.pdf`, content: pdfOutput }]
+    });
+
+    res.status(200).json({ ok: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 }

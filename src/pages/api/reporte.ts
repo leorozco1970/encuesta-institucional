@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 // @ts-ignore
 import nodemailer from 'nodemailer';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable'; // <-- EL CAMBIO CLAVE ESTÁ AQUÍ
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -25,10 +25,9 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
 
-    // Esta es la limpieza mágica que funcionó en tu prueba
+    // Limpiador infalible que ya probamos
     const limpiar = (t: string) => t ? t.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
     const busqueda = limpiar(nombreInstitucion);
-
     const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
@@ -45,21 +44,22 @@ export default async function handler(req: any, res: any) {
       if (!v) return 0;
       const val = v.trim().toLowerCase();
       if (val === "mucho" || val === "siempre" || val === "totalmente") return 100;
-      if (val === "algo" || val === "casi siempre" || val === "a veces") return 75; // Agregado "a veces"
-      if (val === "poco" || val === "nunca") return 50; // Agregado "nunca"
+      if (val === "algo" || val === "casi siempre" || val === "a veces") return 75;
+      if (val === "poco" || val === "nunca") return 50;
       if (val === "nada") return 25;
       return 0;
     };
 
     const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.setFontSize(16);
+    doc.text("INFORME DIAGNOSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
 
     const nombreLimpioParaPDF = datos[0][1].toString().replace(/\n/g, ' ');
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.text(`Institución: ${nombreLimpioParaPDF}`, 20, 35);
 
-    (doc as any).autoTable({
+    // DIBUJO SEGURO DE TABLA 1
+    autoTable(doc, {
       startY: 45,
       head: [['Estamento', 'Cant. Participantes']],
       body: [
@@ -79,7 +79,7 @@ export default async function handler(req: any, res: any) {
 
     let y = (doc as any).lastAutoTable.finalY + 15;
     ejes.forEach(e => {
-      if (y > 250) { doc.addPage(); y = 20; } // Por si la tabla es muy larga, pasa a la otra hoja
+      if (y > 250) { doc.addPage(); y = 20; }
       doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
       const rows = e.actors.map(actor => {
         const sub = datos.filter(f => f[3] && limpiar(f[3]).includes(actor[1]));
@@ -87,7 +87,8 @@ export default async function handler(req: any, res: any) {
         sub.forEach(f => { if (f[e.col]) { suma += puntaje(f[e.col]); count++; } });
         return [actor[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
       });
-      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: rows });
+      // DIBUJO SEGURO DE TABLAS SECUNDARIAS
+      autoTable(doc, { startY: y + 5, head: [['Actor', 'Favorabilidad']], body: rows });
       y = (doc as any).lastAutoTable.finalY + 15;
     });
 
@@ -102,5 +103,9 @@ export default async function handler(req: any, res: any) {
     });
 
     res.status(200).json({ ok: true });
-  } catch (e: any) { res.status(500).json({ error: e.message }); }
+  } catch (e: any) { 
+    // Ahora si falla, te dirá el error real y no "No se encontraron datos"
+    console.error(e);
+    res.status(500).json({ error: `Error interno: ${e.message}` }); 
+  }
 }

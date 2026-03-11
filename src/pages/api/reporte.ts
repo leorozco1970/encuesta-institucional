@@ -24,12 +24,13 @@ export default async function handler(req: any, res: any) {
     });
 
     const filas = resSheet.data.values || [];
-    const busqueda = nombreInstitucion.toLowerCase().trim();
-    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(busqueda));
+    const query = nombreInstitucion.toLowerCase().trim();
+    // Búsqueda simple (la que sí funciona)
+    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(query));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
-    // --- PROCESAMIENTO RÁPIDO ---
+    // --- CÁLCULOS ---
     const estamentos = {
       Directivos: datos.filter(f => f[3]?.toLowerCase().includes('directivo')).length,
       Docentes: datos.filter(f => f[3]?.toLowerCase().includes('docente')).length,
@@ -43,12 +44,8 @@ export default async function handler(req: any, res: any) {
     };
 
     const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("INFORME DIAGNÓSTICO PTA/FI 3.0", 105, 20, { align: "center" });
-    doc.setFontSize(12);
-    // Limpiamos el nombre de saltos de línea para el texto del PDF
-    const nombreLimpio = datos[0][1].replace(/[\n\r]/g, " ");
-    doc.text(`Institución: ${nombreLimpio}`, 20, 35);
+    doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 35);
 
     (doc as any).autoTable({
       startY: 45,
@@ -56,7 +53,6 @@ export default async function handler(req: any, res: any) {
       body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
     });
 
-    // Mapeo de Ejes (Columnas F, G, H, J)
     const ejes = [
       { t: "EJE 1: CONVIVENCIA", col: 7 },
       { t: "EJE 2: CRESE", col: 5 },
@@ -77,25 +73,14 @@ export default async function handler(req: any, res: any) {
       y = (doc as any).lastAutoTable.finalY + 15;
     });
 
-    // --- ENVÍO DE CORREO (CON NOMBRE DE ARCHIVO SEGURO) ---
-    const transporter = nodemailer.createTransport({ 
-      service: 'gmail', 
-      auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } 
-    });
-
+    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
     await transporter.sendMail({
-      from: '"Reporte PTA" <leorozco1970@gmail.com>',
+      from: '"PTA/FI 3.0" <leorozco1970@gmail.com>',
       to: destinoCorreo,
-      subject: `📊 Reporte: ${nombreInstitucion.substring(0, 20)}`,
-      attachments: [{ 
-        filename: `Informe_Diagnostico.pdf`, // Nombre estático para evitar errores de caracteres
-        content: Buffer.from(doc.output('arraybuffer')) 
-      }]
+      subject: `📊 Informe Final: ${nombreInstitucion}`,
+      attachments: [{ filename: `Informe.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
     });
 
     res.status(200).json({ ok: true });
-  } catch (e: any) { 
-    console.error("Error envío:", e);
-    res.status(500).json({ error: e.message }); 
-  }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 }

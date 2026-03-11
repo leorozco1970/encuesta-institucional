@@ -1,3 +1,4 @@
+// VERSION FINAL CON TEXTOS PEDAGOGICOS Y CDA G9
 import { google } from 'googleapis';
 // @ts-ignore
 import nodemailer from 'nodemailer';
@@ -25,12 +26,14 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
 
+    // Limpiador antibloqueos
     const limpiar = (t: string) => t ? t.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
     const busqueda = limpiar(nombreInstitucion);
     const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
+    // --- CÁLCULOS PROFESIONALES ---
     const estamentos = {
       Directivos: datos.filter(f => f[3] && limpiar(f[3]).includes('directivo')).length,
       Docentes: datos.filter(f => f[3] && limpiar(f[3]).includes('docente')).length,
@@ -59,6 +62,7 @@ export default async function handler(req: any, res: any) {
     doc.setFontSize(11);
     doc.text(`Institución: ${nombreLimpioParaPDF}`, 20, 32);
 
+    // Texto del Propósito
     doc.setFont("helvetica", "italic");
     const propositoTexto = "Propósito: Comprender profundamente el contexto territorial, institucional y comunitario para fundamentar decisiones pedagógicas pertinentes.";
     const lineasProposito = doc.splitTextToSize(propositoTexto, 170);
@@ -66,6 +70,7 @@ export default async function handler(req: any, res: any) {
 
     let yActual = 42 + (lineasProposito.length * 6) + 5;
 
+    // Tabla inicial
     autoTable(doc, {
       startY: yActual,
       head: [['Estamento', 'Cant. Participantes']],
@@ -77,6 +82,7 @@ export default async function handler(req: any, res: any) {
       ],
     });
 
+    // Configuración de los Ejes y sus textos
     const ejes = [
       { 
         t: "EJE 1: CONVIVENCIA", col: 7, 
@@ -107,21 +113,21 @@ export default async function handler(req: any, res: any) {
     yActual = (doc as any).lastAutoTable.finalY + 15;
 
     ejes.forEach(e => {
-      // Si estamos muy abajo en la hoja, pasamos a la siguiente
-      if (yActual > 240) { doc.addPage(); yActual = 20; }
+      // Salto de página automático si estamos muy abajo
+      if (yActual > 230) { doc.addPage(); yActual = 20; }
       
       // Título del Eje
       doc.setFont("helvetica", "bold"); 
       doc.text(e.t, 20, yActual);
       yActual += 7;
 
-      // Texto Explicativo del Eje
+      // Descripción del Eje
       doc.setFont("helvetica", "normal");
       const lineasDesc = doc.splitTextToSize(e.desc, 170);
       doc.text(lineasDesc, 20, yActual);
       yActual += (lineasDesc.length * 6) + 3;
 
-      // Tabla del Eje
+      // Calcular datos de la tabla
       const rows = e.actors.map(actor => {
         const sub = datos.filter(f => f[3] && limpiar(f[3]).includes(actor[1]));
         let suma = 0, count = 0;
@@ -129,6 +135,7 @@ export default async function handler(req: any, res: any) {
         return [actor[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
       });
 
+      // Dibujar tabla
       autoTable(doc, { startY: yActual, head: [['Actor', 'Favorabilidad']], body: rows });
       yActual = (doc as any).lastAutoTable.finalY + 7;
 
@@ -136,7 +143,7 @@ export default async function handler(req: any, res: any) {
       doc.setFont("helvetica", "italic");
       const lineasTriang = doc.splitTextToSize(e.triang, 170);
       doc.text(lineasTriang, 20, yActual);
-      yActual += (lineasTriang.length * 6) + 15;
+      yActual += (lineasTriang.length * 6) + 15; // Espacio para el siguiente eje
     });
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
@@ -167,4 +174,3 @@ export default async function handler(req: any, res: any) {
     res.status(500).json({ error: `Error interno: ${e.message}` }); 
   }
 }
-// Forzando a Git a ver los textos pedagogicos

@@ -1,4 +1,3 @@
-// VERSION FINAL CON TEXTOS PEDAGOGICOS Y CDA G9
 import { google } from 'googleapis';
 // @ts-ignore
 import nodemailer from 'nodemailer';
@@ -26,7 +25,7 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
 
-    // Limpiador antibloqueos
+    // Limpiador antibloqueos que ya comprobamos que funciona
     const limpiar = (t: string) => t ? t.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
     const busqueda = limpiar(nombreInstitucion);
     const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
@@ -82,7 +81,7 @@ export default async function handler(req: any, res: any) {
       ],
     });
 
-    // Configuración de los Ejes y sus textos
+    // Configuración de los Ejes y sus textos pedagógicos
     const ejes = [
       { 
         t: "EJE 1: CONVIVENCIA", col: 7, 
@@ -113,7 +112,7 @@ export default async function handler(req: any, res: any) {
     yActual = (doc as any).lastAutoTable.finalY + 15;
 
     ejes.forEach(e => {
-      // Salto de página automático si estamos muy abajo
+      // Salto de página automático si estamos muy abajo en la hoja
       if (yActual > 230) { doc.addPage(); yActual = 20; }
       
       // Título del Eje
@@ -143,7 +142,7 @@ export default async function handler(req: any, res: any) {
       doc.setFont("helvetica", "italic");
       const lineasTriang = doc.splitTextToSize(e.triang, 170);
       doc.text(lineasTriang, 20, yActual);
-      yActual += (lineasTriang.length * 6) + 15; // Espacio para el siguiente eje
+      yActual += (lineasTriang.length * 6) + 15; // Dejamos espacio para el siguiente eje
     });
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));

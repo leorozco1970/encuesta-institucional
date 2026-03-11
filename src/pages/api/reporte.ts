@@ -25,56 +25,59 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
     
-    // BUSQUEDA SIN FILTROS AGRESIVOS: Solo pasamos a minúsculas
-    const buscar = nombreInstitucion.toLowerCase().trim();
-    const datos = filas.filter(f => f[1] && f[1].toString().toLowerCase().includes(buscar));
+    // FUNCIÓN DE LIMPIEZA PROFUNDA: Quita tildes, puntos, espacios y SALTOS DE LÍNEA
+    const limpiar = (t: string) => 
+      t ? t.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
+
+    const busqueda = limpiar(nombreInstitucion);
+    const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
     // --- CÁLCULOS ---
     const estamentos = {
-      Directivos: datos.filter(f => f[3]?.toLowerCase().includes('directivo')).length,
-      Docentes: datos.filter(f => f[3]?.toLowerCase().includes('docente')).length,
-      Estudiantes: datos.filter(f => f[3]?.toLowerCase().includes('estudiante')).length,
-      Padres: datos.filter(f => f[3]?.toLowerCase().includes('padre')).length
+      Directivos: datos.filter(f => limpiar(f[3]).includes('directivo')).length,
+      Docentes: datos.filter(f => limpiar(f[3]).includes('docente')).length,
+      Estudiantes: datos.filter(f => limpiar(f[3]).includes('estudiante')).length,
+      Padres: datos.filter(f => limpiar(f[3]).includes('padre')).length
+    };
+
+    const puntaje = (v: string) => {
+      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
+      return m[v] || 0;
     };
 
     const doc = new jsPDF();
+    doc.setFontSize(18);
     doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
-    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 35);
+    
+    // Limpiamos el nombre para que salga bonito en el PDF sin saltos de línea
+    const nombreLimpioParaPDF = datos[0][1].toString().replace(/\n/g, ' ');
+    doc.setFontSize(12);
+    doc.text(`Institución: ${nombreLimpioParaPDF}`, 20, 35);
 
     (doc as any).autoTable({
       startY: 45,
-      head: [['Estamento', 'Cant.']],
+      head: [['Estamento', 'Cant. Participantes']],
       body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
     });
 
     const ejes = [
-      { t: "EJE 1: CONVIVENCIA", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
-      { t: "EJE 2: CRESE", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 3: TERRITORIO", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
-      { t: "EJE 4: CENTROS DE INTERÉS", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
+      { t: "EJE 1: CONVIVENCIA", col: 7, actors: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 2: CRESE", col: 5, actors: [['Directivos','directivo'], ['Docentes','docente']] },
+      { t: "EJE 3: TERRITORIO", col: 9, actors: [['Directivos','directivo'], ['Docentes','docente']] }
     ];
 
     let y = (doc as any).lastAutoTable.finalY + 15;
     ejes.forEach(e => {
       doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
-      const rows = e.r.map(actor => {
-        const sub = datos.filter(f => f[3]?.toLowerCase().includes(actor[1]));
+      const rows = e.actors.map(actor => {
+        const sub = datos.filter(f => limpiar(f[3]).includes(actor[1]));
         let suma = 0, count = 0;
-        sub.forEach(f => {
-          if (f[e.col]) {
-            const v = f[e.col];
-            if (v === "Mucho" || v === "Siempre" || v === "Totalmente") suma += 100;
-            else if (v === "Algo") suma += 75;
-            else if (v === "Poco") suma += 50;
-            else suma += 25;
-            count++;
-          }
-        });
+        sub.forEach(f => { if (f[e.col]) { suma += puntaje(f[e.col]); count++; } });
         return [actor[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
       });
-      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Fav.']], body: rows });
+      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: rows });
       y = (doc as any).lastAutoTable.finalY + 15;
     });
 
@@ -82,7 +85,7 @@ export default async function handler(req: any, res: any) {
     await transporter.sendMail({
       from: '"Reporte PTA" <leorozco1970@gmail.com>',
       to: destinoCorreo,
-      subject: `📊 Informe: ${nombreInstitucion}`,
+      subject: `📊 Informe Final: ${nombreInstitucion}`,
       attachments: [{ filename: `Informe_Diagnostico.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
     });
 

@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
 // @ts-ignore
 import nodemailer from 'nodemailer';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -16,44 +18,84 @@ export default async function handler(req: any, res: any) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    // Intenta leer la Hoja 1
     const resSheet = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
-      range: "'Hoja 1'!A1:B100", 
+      range: "'Hoja 1'!A1:P2000",
     });
 
     const filas = resSheet.data.values || [];
-    const busquedaUsuario = nombreInstitucion.toLowerCase().trim();
-    
-    // Extraemos todos los nombres de la columna B para ver qué hay
-    const nombresEnExcel = filas.slice(1).map(f => f[1]).filter(Boolean);
-    
-    // Buscamos coincidencia
-    const coincidencia = nombresEnExcel.find(n => n.toLowerCase().includes(busquedaUsuario));
+    const busqueda = nombreInstitucion.toLowerCase().trim();
+    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(busqueda));
 
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
+    if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
-    if (!coincidencia) {
-      await transporter.sendMail({
-        from: '"Soporte Técnico" <leorozco1970@gmail.com>',
-        to: destinoCorreo,
-        subject: "🔍 Informe de Error de Datos",
-        html: `
-          <h3>No pude encontrar la institución: "${nombreInstitucion}"</h3>
-          <p><b>Esto fue lo que encontré en tu Excel:</b></p>
-          <ul>
-            ${nombresEnExcel.map(n => `<li>${n}</li>`).join('')}
-          </ul>
-          <p><b>Sugerencia:</b> Asegúrate de que el nombre que escribes en la web esté escrito EXACTAMENTE como aparece en la lista de arriba.</p>
-        `
+    // --- PROCESAMIENTO RÁPIDO ---
+    const estamentos = {
+      Directivos: datos.filter(f => f[3]?.toLowerCase().includes('directivo')).length,
+      Docentes: datos.filter(f => f[3]?.toLowerCase().includes('docente')).length,
+      Estudiantes: datos.filter(f => f[3]?.toLowerCase().includes('estudiante')).length,
+      Padres: datos.filter(f => f[3]?.toLowerCase().includes('padre')).length
+    };
+
+    const puntaje = (v: string) => {
+      const m: any = { "Mucho": 100, "Siempre": 100, "Totalmente": 100, "Algo": 75, "Poco": 50, "Nada": 25 };
+      return m[v] || 0;
+    };
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("INFORME DIAGNÓSTICO PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    // Limpiamos el nombre de saltos de línea para el texto del PDF
+    const nombreLimpio = datos[0][1].replace(/[\n\r]/g, " ");
+    doc.text(`Institución: ${nombreLimpio}`, 20, 35);
+
+    (doc as any).autoTable({
+      startY: 45,
+      head: [['Estamento', 'Participantes']],
+      body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
+    });
+
+    // Mapeo de Ejes (Columnas F, G, H, J)
+    const ejes = [
+      { t: "EJE 1: CONVIVENCIA", col: 7 },
+      { t: "EJE 2: CRESE", col: 5 },
+      { t: "EJE 3: TERRITORIO", col: 9 },
+      { t: "EJE 4: CENTROS DE INTERÉS", col: 6 }
+    ];
+
+    let y = (doc as any).lastAutoTable.finalY + 15;
+    ejes.forEach(e => {
+      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
+      const rows = [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']].map(r => {
+        const sub = datos.filter(f => f[3]?.toLowerCase().includes(r[1]));
+        let suma = 0, count = 0;
+        sub.forEach(f => { if (f[e.col]) { suma += puntaje(f[e.col]); count++; } });
+        return [r[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
       });
-      return res.status(404).json({ error: 'No encontrado. Revisa tu correo para el diagnóstico.' });
-    }
+      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: rows });
+      y = (doc as any).lastAutoTable.finalY + 15;
+    });
 
-    res.status(200).json({ ok: true, msg: "Institución encontrada, pero estamos en modo diagnóstico." });
+    // --- ENVÍO DE CORREO (CON NOMBRE DE ARCHIVO SEGURO) ---
+    const transporter = nodemailer.createTransport({ 
+      service: 'gmail', 
+      auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } 
+    });
 
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    await transporter.sendMail({
+      from: '"Reporte PTA" <leorozco1970@gmail.com>',
+      to: destinoCorreo,
+      subject: `📊 Reporte: ${nombreInstitucion.substring(0, 20)}`,
+      attachments: [{ 
+        filename: `Informe_Diagnostico.pdf`, // Nombre estático para evitar errores de caracteres
+        content: Buffer.from(doc.output('arraybuffer')) 
+      }]
+    });
+
+    res.status(200).json({ ok: true });
+  } catch (e: any) { 
+    console.error("Error envío:", e);
+    res.status(500).json({ error: e.message }); 
   }
 }

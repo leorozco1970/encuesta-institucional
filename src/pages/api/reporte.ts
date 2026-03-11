@@ -5,9 +5,6 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default async function handler(req: any, res: any) {
-  console.log("🚀 1. INICIANDO REPORTE...");
-  console.log("📝 2. DATOS RECIBIDOS DESDE LA WEB:", req.body);
-
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
   const { nombreInstitucion, destinoCorreo } = req.body;
 
@@ -20,48 +17,90 @@ export default async function handler(req: any, res: any) {
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
 
-    console.log("🔑 3. AUTENTICACIÓN GOOGLE EXITOSA.");
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    console.log("📊 4. LEYENDO EXCEL...");
     const resSheet = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
       range: "'Hoja 1'!A1:P2000",
     });
 
     const filas = resSheet.data.values || [];
-    console.log(`✅ 5. SE ENCONTRARON ${filas.length} FILAS EN TOTAL.`);
 
+    // Esta es la limpieza mágica que funcionó en tu prueba
     const limpiar = (t: string) => t ? t.toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase().trim() : "";
     const busqueda = limpiar(nombreInstitucion);
-    console.log(`🔍 6. BUSCANDO LA PALABRA LIMPIA: "${busqueda}"`);
 
     const datos = filas.filter(f => f[1] && limpiar(f[1]).includes(busqueda));
-    console.log(`🎯 7. COINCIDENCIAS ENCONTRADAS PARA EL PDF: ${datos.length}`);
 
-    if (datos.length === 0) {
-      console.log("❌ ERROR: NO HUBO COINCIDENCIAS.");
-      return res.status(404).json({ error: 'No se encontraron datos.' });
-    }
+    if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
-    console.log("📄 8. CREANDO PDF...");
+    // --- CÁLCULOS PROFESIONALES ---
+    const estamentos = {
+      Directivos: datos.filter(f => f[3] && limpiar(f[3]).includes('directivo')).length,
+      Docentes: datos.filter(f => f[3] && limpiar(f[3]).includes('docente')).length,
+      Estudiantes: datos.filter(f => f[3] && limpiar(f[3]).includes('estudiante')).length,
+      Padres: datos.filter(f => f[3] && limpiar(f[3]).includes('padre')).length
+    };
+
+    const puntaje = (v: string) => {
+      if (!v) return 0;
+      const val = v.trim().toLowerCase();
+      if (val === "mucho" || val === "siempre" || val === "totalmente") return 100;
+      if (val === "algo" || val === "casi siempre" || val === "a veces") return 75; // Agregado "a veces"
+      if (val === "poco" || val === "nunca") return 50; // Agregado "nunca"
+      if (val === "nada") return 25;
+      return 0;
+    };
+
     const doc = new jsPDF();
-    doc.text("INFORME DE PRUEBA", 10, 10);
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    doc.setFontSize(18);
+    doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
 
-    console.log("📧 9. ENVIANDO CORREO...");
-    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
-    await transporter.sendMail({
-      from: '"Reporte" <leorozco1970@gmail.com>',
-      to: destinoCorreo,
-      subject: `Reporte: ${nombreInstitucion}`,
-      attachments: [{ filename: `Informe.pdf`, content: pdfBuffer }]
+    const nombreLimpioParaPDF = datos[0][1].toString().replace(/\n/g, ' ');
+    doc.setFontSize(12);
+    doc.text(`Institución: ${nombreLimpioParaPDF}`, 20, 35);
+
+    (doc as any).autoTable({
+      startY: 45,
+      head: [['Estamento', 'Cant. Participantes']],
+      body: [
+        ['Directivos', estamentos.Directivos],
+        ['Docentes', estamentos.Docentes],
+        ['Estudiantes', estamentos.Estudiantes],
+        ['Padres', estamentos.Padres]
+      ],
     });
 
-    console.log("🎉 10. TODO TERMINADO CON ÉXITO.");
+    const ejes = [
+      { t: "EJE 1: CONVIVENCIA", col: 7, actors: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante'], ['Padres','padre']] },
+      { t: "EJE 2: CRESE", col: 5, actors: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 3: TERRITORIO", col: 9, actors: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 4: CENTROS DE INTERÉS", col: 6, actors: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
+    ];
+
+    let y = (doc as any).lastAutoTable.finalY + 15;
+    ejes.forEach(e => {
+      if (y > 250) { doc.addPage(); y = 20; } // Por si la tabla es muy larga, pasa a la otra hoja
+      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
+      const rows = e.actors.map(actor => {
+        const sub = datos.filter(f => f[3] && limpiar(f[3]).includes(actor[1]));
+        let suma = 0, count = 0;
+        sub.forEach(f => { if (f[e.col]) { suma += puntaje(f[e.col]); count++; } });
+        return [actor[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
+      });
+      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Favorabilidad']], body: rows });
+      y = (doc as any).lastAutoTable.finalY + 15;
+    });
+
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+
+    const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
+    await transporter.sendMail({
+      from: '"Reporte PTA" <leorozco1970@gmail.com>',
+      to: destinoCorreo,
+      subject: `📊 Informe Final: ${nombreInstitucion}`,
+      attachments: [{ filename: `Informe_Diagnostico.pdf`, content: pdfBuffer }]
+    });
+
     res.status(200).json({ ok: true });
-  } catch (e: any) { 
-    console.error("🔥 ERROR FATAL ATRAPADO:", e.message);
-    res.status(500).json({ error: e.message }); 
-  }
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 }

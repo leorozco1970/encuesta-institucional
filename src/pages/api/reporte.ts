@@ -5,7 +5,9 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
   const { nombreInstitucion, destinoCorreo } = req.body;
+
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -22,34 +24,69 @@ export default async function handler(req: any, res: any) {
     });
 
     const filas = resSheet.data.values || [];
-    // BUSQUEDA SIN FILTROS (Solo minúsculas para que no falle)
-    const term = nombreInstitucion.toLowerCase().trim();
-    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(term));
-
-    if (datos.length === 0) {
-      // SI FALLA: Enviamos correo con lo que hay en la celda B6 para ver el error
-      const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
-      await transporter.sendMail({
-        from: 'Soporte', to: destinoCorreo, subject: 'Fallo Crítico de Búsqueda',
-        text: `Buscaste: "${term}". En la fila 6 dice: "${filas[5][1]}"`
-      });
-      return res.status(404).json({ error: 'No encontrado. Revisa tu email.' });
-    }
-
-    // --- REPORTE RÁPIDO ---
-    const doc = new jsPDF();
-    doc.text("REPORTE DE EMERGENCIA PTA/FI 3.0", 105, 20, { align: "center" });
-    doc.text(`Institución: ${datos[0][1]}`, 20, 35);
     
+    // BÚSQUEDA ULTRA-SIMPLE (La que sí funcionó)
+    const buscar = nombreInstitucion.toUpperCase().trim();
+    const datos = filas.filter(f => f[1] && f[1].toString().toUpperCase().includes(buscar));
+
+    if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
+
+    // --- CÁLCULOS ---
+    const estamentos = {
+      Directivos: datos.filter(f => f[3]?.includes('Directivo')).length,
+      Docentes: datos.filter(f => f[3]?.includes('Docente')).length,
+      Estudiantes: datos.filter(f => f[3]?.includes('Estudiante')).length,
+      Padres: datos.filter(f => f[3]?.includes('Padre')).length
+    };
+
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 35);
+
     (doc as any).autoTable({
-      startY: 45, head: [['Dato', 'Valor']],
-      body: [['Registros encontrados', datos.length], ['Institución detectada', datos[0][1]]]
+      startY: 45,
+      head: [['Estamento', 'Cant.']],
+      body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
+    });
+
+    // Mapeo de Ejes (Columnas F, G, H, J -> 5, 6, 7, 9)
+    const ejes = [
+      { t: "EJE 1: CONVIVENCIA", col: 7 },
+      { t: "EJE 2: CRESE", col: 5 },
+      { t: "EJE 3: TERRITORIO", col: 9 },
+      { t: "EJE 4: CENTROS DE INTERÉS", col: 6 }
+    ];
+
+    let y = (doc as any).lastAutoTable.finalY + 15;
+    ejes.forEach(e => {
+      doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
+      const rows = [['Directivos','Directivo'], ['Docentes','Docente'], ['Estudiantes','Estudiante']].map(r => {
+        const sub = datos.filter(f => f[3]?.includes(r[1]));
+        let suma = 0, count = 0;
+        sub.forEach(f => { 
+          if (f[e.col]) { 
+            const v = f[e.col];
+            if (v === "Mucho" || v === "Siempre" || v === "Totalmente") suma += 100;
+            else if (v === "Algo") suma += 75;
+            else if (v === "Poco") suma += 50;
+            else suma += 25;
+            count++; 
+          } 
+        });
+        return [r[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
+      });
+      (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Fav.']], body: rows });
+      y = (doc as any).lastAutoTable.finalY + 15;
     });
 
     const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
     await transporter.sendMail({
-      from: 'PTA/FI 3.0', to: destinoCorreo, subject: `📊 Informe: ${nombreInstitucion}`,
-      attachments: [{ filename: 'Reporte.pdf', content: Buffer.from(doc.output('arraybuffer')) }]
+      from: '"Reporte PTA" <leorozco1970@gmail.com>',
+      to: destinoCorreo,
+      subject: `📊 Informe: ${nombreInstitucion}`,
+      attachments: [{ filename: `Informe_Diagnostico.pdf`, content: Buffer.from(doc.output('arraybuffer')) }]
     });
 
     res.status(200).json({ ok: true });

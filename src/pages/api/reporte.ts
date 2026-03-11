@@ -5,9 +5,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default async function handler(req: any, res: any) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
   const { nombreInstitucion, destinoCorreo } = req.body;
-
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: {
@@ -18,49 +16,34 @@ export default async function handler(req: any, res: any) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    // Obtenemos los valores brutos
     const resSheet = await sheets.spreadsheets.values.get({
       spreadsheetId: '15oJuvgGQIFE4cbGR3VU_zZ6sEco4gKDlUa6j0aoJj_g',
       range: "'Hoja 1'!A1:P2000",
-      valueRenderOption: 'UNFORMATTED_VALUE', // CLAVE: Lee el texto sin el formato de Excel
     });
 
     const filas = resSheet.data.values || [];
-    
-    // Buscador "Súper-Limpio"
-    const normalize = (str: string) => 
-      str ? str.toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "") : "";
-
-    const term = normalize(nombreInstitucion);
-    
-    // Filtrado manual fila por fila
-    const datos = filas.filter(f => {
-      const nombreEnFila = normalize(f[1]); // Columna B
-      return nombreEnFila.includes(term);
-    });
+    // BUSQUEDA SIN FILTROS (Solo minúsculas para que no falle)
+    const term = nombreInstitucion.toLowerCase().trim();
+    const datos = filas.filter(f => f[1] && f[1].toLowerCase().includes(term));
 
     if (datos.length === 0) {
-      // Si falla, enviamos un correo de pánico con lo que el robot leyó
-      const nombresVistos = filas.slice(1, 10).map(f => f[1]).join(", ");
+      // SI FALLA: Enviamos correo con lo que hay en la celda B6 para ver el error
       const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
       await transporter.sendMail({
-        from: 'Soporte', to: destinoCorreo, subject: 'Error de Búsqueda',
-        text: `No encontré "${nombreInstitucion}". En las primeras filas vi: ${nombresVistos}`
+        from: 'Soporte', to: destinoCorreo, subject: 'Fallo Crítico de Búsqueda',
+        text: `Buscaste: "${term}". En la fila 6 dice: "${filas[5][1]}"`
       });
-      return res.status(404).json({ error: 'No se encontraron datos. Revisa tu email.' });
+      return res.status(404).json({ error: 'No encontrado. Revisa tu email.' });
     }
 
-    // --- GENERACIÓN DEL PDF (IGUAL AL ANTERIOR PERO MÁS SEGURO) ---
+    // --- REPORTE RÁPIDO ---
     const doc = new jsPDF();
-    doc.text("INFORME PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
-    doc.text(`Institución: ${datos[0][1].toString().replace(/\n/g, ' ')}`, 20, 35);
-
-    // ... (El resto del código de tablas que ya teníamos) ...
-    // Para abreviar y que pegues rápido, enviemos el PDF con la muestra básica primero
+    doc.text("REPORTE DE EMERGENCIA PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.text(`Institución: ${datos[0][1]}`, 20, 35);
+    
     (doc as any).autoTable({
-      startY: 45, head: [['Estamento', 'Cant']],
-      body: [['Participantes Encontrados', datos.length]]
+      startY: 45, head: [['Dato', 'Valor']],
+      body: [['Registros encontrados', datos.length], ['Institución detectada', datos[0][1]]]
     });
 
     const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });

@@ -55,7 +55,7 @@ export default async function handler(req: any, res: any) {
     // --- ENCABEZADO Y PROPÓSITO ---
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
+    doc.text("INFORME DIAGNÓSTICO INSTITUCIONAL PTA/FI 3.0", 105, 20, { align: "center" });
 
     const nombreLimpioParaPDF = datos[0][1].toString().replace(/\n/g, ' ');
     doc.setFontSize(11);
@@ -157,7 +157,7 @@ export default async function handler(req: any, res: any) {
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
           <h2 style="color: #1e3a8a;">Cordial saludo,</h2>
           <p style="font-size: 16px;">
-            <b>LA CDA G9 AVANZANDO LES ENVÍA EL REPORTE DEL DIAGNÓSTICO INSTITUCIONAL.</b>
+            <b>LA CDA G9 AVANZANDO- ATLANTICO LES ENVÍA EL REPORTE DEL DIAGNÓSTICO INSTITUCIONAL.</b>
           </p>
           <p>Adjunto a este correo encontrará el documento PDF con los resultados detallados y la triangulación pedagógica.</p>
           <br/>

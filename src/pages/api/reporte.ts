@@ -107,17 +107,21 @@ export default async function handler(req: any, res: any) {
     yActual = (doc as any).lastAutoTable.finalY + 15;
 
     ejes.forEach(e => {
+      // Si estamos muy abajo en la hoja, pasamos a la siguiente
       if (yActual > 240) { doc.addPage(); yActual = 20; }
       
+      // Título del Eje
       doc.setFont("helvetica", "bold"); 
       doc.text(e.t, 20, yActual);
       yActual += 7;
 
+      // Texto Explicativo del Eje
       doc.setFont("helvetica", "normal");
       const lineasDesc = doc.splitTextToSize(e.desc, 170);
       doc.text(lineasDesc, 20, yActual);
       yActual += (lineasDesc.length * 6) + 3;
 
+      // Tabla del Eje
       const rows = e.actors.map(actor => {
         const sub = datos.filter(f => f[3] && limpiar(f[3]).includes(actor[1]));
         let suma = 0, count = 0;
@@ -128,6 +132,7 @@ export default async function handler(req: any, res: any) {
       autoTable(doc, { startY: yActual, head: [['Actor', 'Favorabilidad']], body: rows });
       yActual = (doc as any).lastAutoTable.finalY + 7;
 
+      // Texto de Triangulación
       doc.setFont("helvetica", "italic");
       const lineasTriang = doc.splitTextToSize(e.triang, 170);
       doc.text(lineasTriang, 20, yActual);
@@ -136,10 +141,10 @@ export default async function handler(req: any, res: any) {
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
 
-    // --- CORREO CON MENSAJE PERSONALIZADO ---
+    // --- CORREO CON MENSAJE DE LA CDA G9 ---
     const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: 'leorozco1970@gmail.com', pass: 'mdso vzyq xaju vavn' } });
     await transporter.sendMail({
-      from: '"CDA G9 AVANZANDO" <leorozco1970@gmail.com>', // Cambiamos también el remitente
+      from: '"CDA G9 AVANZANDO" <leorozco1970@gmail.com>',
       to: destinoCorreo,
       subject: `📊 Informe Diagnóstico: ${nombreLimpioParaPDF}`,
       html: `
@@ -148,9 +153,9 @@ export default async function handler(req: any, res: any) {
           <p style="font-size: 16px;">
             <b>LA CDA G9 AVANZANDO LES ENVÍA EL REPORTE DEL DIAGNÓSTICO INSTITUCIONAL.</b>
           </p>
-          <p>Adjunto a este correo encontrará el documento PDF con los resultados y la triangulación pedagógica.</p>
+          <p>Adjunto a este correo encontrará el documento PDF con los resultados detallados y la triangulación pedagógica.</p>
           <br/>
-          <p style="font-size: 12px; color: #666;">Este es un mensaje automático generado por el sistema PTA/FI 3.0.</p>
+          <p style="font-size: 12px; color: #666;">Este es un mensaje generado automáticamente.</p>
         </div>
       `,
       attachments: [{ filename: `Informe_Diagnostico_PTA.pdf`, content: pdfBuffer }]

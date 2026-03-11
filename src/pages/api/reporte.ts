@@ -25,24 +25,22 @@ export default async function handler(req: any, res: any) {
 
     const filas = resSheet.data.values || [];
     
-    // BÚSQUEDA ULTRA-SIMPLE (La que sí funcionó)
-    const buscar = nombreInstitucion.toUpperCase().trim();
-    const datos = filas.filter(f => f[1] && f[1].toString().toUpperCase().includes(buscar));
+    // BUSQUEDA SIN FILTROS AGRESIVOS: Solo pasamos a minúsculas
+    const buscar = nombreInstitucion.toLowerCase().trim();
+    const datos = filas.filter(f => f[1] && f[1].toString().toLowerCase().includes(buscar));
 
     if (datos.length === 0) return res.status(404).json({ error: 'No se encontraron datos.' });
 
     // --- CÁLCULOS ---
     const estamentos = {
-      Directivos: datos.filter(f => f[3]?.includes('Directivo')).length,
-      Docentes: datos.filter(f => f[3]?.includes('Docente')).length,
-      Estudiantes: datos.filter(f => f[3]?.includes('Estudiante')).length,
-      Padres: datos.filter(f => f[3]?.includes('Padre')).length
+      Directivos: datos.filter(f => f[3]?.toLowerCase().includes('directivo')).length,
+      Docentes: datos.filter(f => f[3]?.toLowerCase().includes('docente')).length,
+      Estudiantes: datos.filter(f => f[3]?.toLowerCase().includes('estudiante')).length,
+      Padres: datos.filter(f => f[3]?.toLowerCase().includes('padre')).length
     };
 
     const doc = new jsPDF();
-    doc.setFontSize(18);
     doc.text("INFORME DIAGNÓSTICO PROFESIONAL PTA/FI 3.0", 105, 20, { align: "center" });
-    doc.setFontSize(12);
     doc.text(`Institución: ${datos[0][1].replace(/\n/g, ' ')}`, 20, 35);
 
     (doc as any).autoTable({
@@ -51,31 +49,30 @@ export default async function handler(req: any, res: any) {
       body: [['Directivos', estamentos.Directivos], ['Docentes', estamentos.Docentes], ['Estudiantes', estamentos.Estudiantes], ['Padres', estamentos.Padres]],
     });
 
-    // Mapeo de Ejes (Columnas F, G, H, J -> 5, 6, 7, 9)
     const ejes = [
-      { t: "EJE 1: CONVIVENCIA", col: 7 },
-      { t: "EJE 2: CRESE", col: 5 },
-      { t: "EJE 3: TERRITORIO", col: 9 },
-      { t: "EJE 4: CENTROS DE INTERÉS", col: 6 }
+      { t: "EJE 1: CONVIVENCIA", col: 7, r: [['Directivos','directivo'], ['Docentes','docente'], ['Padres','padre'], ['Estudiantes','estudiante']] },
+      { t: "EJE 2: CRESE", col: 5, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 3: TERRITORIO", col: 9, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] },
+      { t: "EJE 4: CENTROS DE INTERÉS", col: 6, r: [['Directivos','directivo'], ['Docentes','docente'], ['Estudiantes','estudiante']] }
     ];
 
     let y = (doc as any).lastAutoTable.finalY + 15;
     ejes.forEach(e => {
       doc.setFont("helvetica", "bold"); doc.text(e.t, 20, y);
-      const rows = [['Directivos','Directivo'], ['Docentes','Docente'], ['Estudiantes','Estudiante']].map(r => {
-        const sub = datos.filter(f => f[3]?.includes(r[1]));
+      const rows = e.r.map(actor => {
+        const sub = datos.filter(f => f[3]?.toLowerCase().includes(actor[1]));
         let suma = 0, count = 0;
-        sub.forEach(f => { 
-          if (f[e.col]) { 
+        sub.forEach(f => {
+          if (f[e.col]) {
             const v = f[e.col];
             if (v === "Mucho" || v === "Siempre" || v === "Totalmente") suma += 100;
             else if (v === "Algo") suma += 75;
             else if (v === "Poco") suma += 50;
             else suma += 25;
-            count++; 
-          } 
+            count++;
+          }
         });
-        return [r[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
+        return [actor[0], count > 0 ? (suma/count).toFixed(1) + "%" : "0%"];
       });
       (doc as any).autoTable({ startY: y + 5, head: [['Actor', 'Fav.']], body: rows });
       y = (doc as any).lastAutoTable.finalY + 15;

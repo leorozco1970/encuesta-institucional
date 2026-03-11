@@ -196,7 +196,6 @@ export default function DiagnosticoAutomatizado() {
     }
   };
 
-  // FUNCIÓN PARA EL REPORTE MAESTRO
   const dispararReporte = async () => {
     const inst = prompt("Nombre exacto de la institución a reportar:");
     const mail = prompt("Correo donde enviar el PDF:");
@@ -230,10 +229,21 @@ export default function DiagnosticoAutomatizado() {
             <input type="text" value={instInput} onChange={(e) => setInstInput(e.target.value)} placeholder="NOMBRE DE LA INSTITUCIÓN..." className="w-full px-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 uppercase bg-slate-50" />
             <input type="email" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} placeholder="TU CORREO ELECTRÓNICO..." className="w-full px-6 py-6 rounded-3xl border-4 border-blue-50 focus:border-blue-600 outline-none text-xl font-black text-blue-900 bg-slate-50" />
         </div>
-        <Button disabled={instInput.trim().length < 5 || !emailInput.includes("@")} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20">CONTINUAR</Button>
+        
+        {/* AQUÍ ESTÁ EL CAMBIO SOLICITADO */}
+        <div className="flex flex-col items-center gap-6">
+          <Button disabled={instInput.trim().length < 5 || !emailInput.includes("@")} onClick={() => setVista('inicio')} className="w-full max-w-xs mx-auto h-20">
+            CONTINUAR
+          </Button>
+          
+          <p className="text-lg font-bold text-slate-700 uppercase tracking-tight leading-relaxed">
+            PROGRAMA DE TUTORÍAS Y FORMACIÓN INTEGRAL PTA/FI 3.0 <br />
+            CDA G9 AVANZANDO - ATLÁNTICO <br />
+            LEONARDO OROZCO
+          </p>
+        </div>
       </Card>
       
-      {/* BOTÓN SECRETO PARA CAMILO */}
       <button 
         onClick={dispararReporte}
         className="fixed bottom-6 right-6 bg-slate-800 text-white px-6 py-4 rounded-full shadow-2xl opacity-40 hover:opacity-100 transition-all flex items-center gap-3 font-bold"
